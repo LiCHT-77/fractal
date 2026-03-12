@@ -1,0 +1,20 @@
+{
+  "name": "fractal",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "format": "biome format --write ."
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.4.6",
+    "@types/bun": "latest",
+    "vitest": "^4.0.18"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  }
+}
