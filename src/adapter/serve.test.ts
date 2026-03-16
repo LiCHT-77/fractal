@@ -255,6 +255,23 @@ describe("adapter/serve", () => {
       }).not.toThrow();
     });
 
+    test("dispose() calls unsubscribe only once", () => {
+      const app = new Fractal();
+      const endpoint = createMockEndpoint();
+
+      const server = serve(app, endpoint);
+      expect(endpoint.handlers.length).toBe(1);
+
+      server.dispose();
+      server.dispose();
+      server.dispose();
+
+      // The handler should have been removed exactly once
+      expect(endpoint.handlers.length).toBe(0);
+      // onMessage was called once to register, the unsubscribe returned should only be invoked once
+      expect(endpoint.onMessage).toHaveBeenCalledTimes(1);
+    });
+
     test("async handler response send is attempted after dispose", async () => {
       const app = new Fractal().method("slow", async (c) => {
         await new Promise((r) => setTimeout(r, 30));

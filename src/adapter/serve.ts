@@ -79,7 +79,12 @@ export function serve(
     },
   );
 
-  const dispose = unsubscribe;
+  let disposed = false;
+  const dispose = () => {
+    if (disposed) return;
+    disposed = true;
+    unsubscribe();
+  };
 
   return {
     dispose,

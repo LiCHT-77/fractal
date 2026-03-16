@@ -14,7 +14,9 @@ import { createContext } from "./context.ts";
 import { MiddlewareRegistry } from "./middleware.ts";
 import { Router } from "./router.ts";
 
-type Handler = (c: Context) => JsonRpcResponse | Promise<JsonRpcResponse>;
+type Handler<
+  TParams extends Record<string, unknown> = Record<string, unknown>,
+> = (c: Context<TParams>) => JsonRpcResponse | Promise<JsonRpcResponse>;
 type Middleware = (
   c: Context,
   next: () => Promise<void>,
@@ -23,7 +25,7 @@ type Middleware = (
 
 type ExtractSuccess<T> = T extends JsonRpcSuccessResponse<infer R> ? R : never;
 
-export type InferResult<H> = H extends (c: Context) => infer Return
+export type InferResult<H> = H extends (c: Context<infer _P>) => infer Return
   ? ExtractSuccess<Awaited<Return>>
   : never;
 
@@ -49,15 +51,18 @@ export class Fractal<S extends Record<string, unknown> = {}> {
     this.middleware = middleware ?? new MiddlewareRegistry();
   }
 
-  method<N extends string, H extends Handler>(
+  method<
+    TParams extends Record<string, unknown> = Record<string, unknown>,
+    N extends string = string,
+    H extends Handler<TParams> = Handler<TParams>,
+  >(
     name: N,
     handler: H,
-  ): Fractal<S & Record<N, InferResult<H>>> {
+  ): Fractal<S & Record<N, { input: TParams; output: InferResult<H> }>> {
     this.router.add(name, handler as (...args: unknown[]) => unknown);
-    return new Fractal<S & Record<N, InferResult<H>>>(
-      this.router,
-      this.middleware,
-    );
+    return new Fractal<
+      S & Record<N, { input: TParams; output: InferResult<H> }>
+    >(this.router, this.middleware);
   }
 
   use(

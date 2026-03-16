@@ -2,6 +2,12 @@
   "name": "fractal",
   "type": "module",
   "private": true,
+  "exports": {
+    ".": "./src/index.ts",
+    "./endpoint": "./src/endpoint/index.ts",
+    "./adapter": "./src/adapter/index.ts",
+    "./client": "./src/client/index.ts"
+  },
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",

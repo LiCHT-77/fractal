@@ -1,8 +1,10 @@
 export type RequestId = string | number | null;
 
-export interface JsonRpcRequest {
+export interface JsonRpcRequest<
+  TParams extends Record<string, unknown> = Record<string, unknown>,
+> {
   method: string;
-  params: Record<string, unknown>;
+  params: TParams;
   id: RequestId | undefined;
   raw: MessageEvent | undefined;
 }
@@ -21,8 +23,10 @@ export interface JsonRpcErrorResponse {
 
 export type JsonRpcResponse = JsonRpcSuccessResponse | JsonRpcErrorResponse;
 
-export interface Context {
-  req: JsonRpcRequest;
+export interface Context<
+  TParams extends Record<string, unknown> = Record<string, unknown>,
+> {
+  req: JsonRpcRequest<TParams>;
   res: JsonRpcResponse | undefined;
   // biome-ignore lint/complexity/noBannedTypes: {} excludes undefined while accepting all other non-nullish values
   json<T extends {} | null>(result: T): JsonRpcSuccessResponse<T>;
