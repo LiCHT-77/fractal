@@ -113,6 +113,8 @@ Endpoint abstraction の責務は以下のみとする。
 3. Core Routing Layer
 4. Client Layer
 
+> **公開 API との対応:** JSON-RPC Layer は論理的には独立したレイヤであるが、公開 API としては Adapter（`serve()`）および Client（`createClient()`）に統合されている。利用者が JSON-RPC Layer を直接操作することはない。外部設計仕様書では Adapter・Client として記述される。
+
 各レイヤの責務を以下に示す。
 
 ### 3.1 Endpoint Layer
@@ -326,11 +328,7 @@ Context は以下を含む。
 
 middleware は handler 実行前後に実行される。
 
-middleware chain は以下の順序で実行される。
-
-1. global middleware
-2. route middleware
-3. handler
+middleware chain は `use()` の登録順に実行され、最後に handler が実行される。
 
 ### 7.4 Error Handling
 
@@ -424,7 +422,20 @@ Adapter は Core を直接呼び出す。
 
 ## 11. モジュール構成
 
-推奨ディレクトリ構造
+### 11.1 公開 API パス
+
+利用者がインポートするパスは以下の通り。
+
+| パス | 提供物 |
+|---|---|
+| `fractal` | `Fractal` クラス（App） |
+| `fractal/endpoint` | `windowEndpoint`, `messagePortEndpoint`, `workerEndpoint`, `serviceWorkerEndpoint`, `onConnect` |
+| `fractal/adapter` | `serve` |
+| `fractal/client` | `createClient`, `RpcError`, `FractalError` |
+
+### 11.2 内部ディレクトリ構造
+
+公開パスの背後にある内部実装の推奨構成。
 
 core/
 
@@ -441,15 +452,11 @@ endpoint/
 - window
 - message-port
 - worker
-
-rpc/
-
-- server
-- client
+- service-worker
 
 adapter/
 
-- server adapters
+- serve
 
 client/
 
@@ -464,6 +471,7 @@ client/
 - BroadcastChannel
 - HTTP transport
 - streaming RPC
+- server-initiated push（サーバーからクライアントへの一方的な通知）。必要な場合は両側でそれぞれ別の Endpoint を用意し、`serve()` + `createClient()` を使用する双方向 RPC パターンで対応可能
 
 ---
 
