@@ -120,7 +120,7 @@ export async function serviceWorkerEndpoint(
 
     try {
       sw.postMessage({ type: "fractal:connect" }, [
-        port as unknown as Transferable,
+        channel.port2 as unknown as Transferable,
       ]);
     } catch (err) {
       if (timerId !== undefined) {
