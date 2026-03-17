@@ -1,6 +1,6 @@
 {
   "name": "@licht-77/fractal",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "type": "module",
   "description": "A type-safe JSON-RPC framework",
   "license": "MIT",
@@ -28,7 +28,7 @@
       "import": "./dist/client/index.js"
     }
   },
-  "files": ["dist", "LICENSE"],
+  "files": ["dist", "LICENSE", "README.md"],
   "scripts": {
     "build": "rm -rf dist && bun run build:js && bun run build:types",
     "build:js": "bun build src/index.ts src/endpoint/index.ts src/adapter/index.ts src/client/index.ts --outdir dist --root src --splitting --format esm --target node",
