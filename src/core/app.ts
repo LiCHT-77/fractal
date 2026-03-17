@@ -14,9 +14,10 @@ import { createContext } from "./context.ts";
 import { MiddlewareRegistry } from "./middleware.ts";
 import { Router } from "./router.ts";
 
-type Handler<
-  TParams extends Record<string, unknown> = Record<string, unknown>,
-> = (c: Context<TParams>) => JsonRpcResponse | Promise<JsonRpcResponse>;
+type Handler = (
+  // biome-ignore lint/suspicious/noExplicitAny: any is needed so Context<T> for all T satisfies this constraint
+  c: Context<any>,
+) => JsonRpcResponse | Promise<JsonRpcResponse>;
 type Middleware = (
   c: Context,
   next: () => Promise<void>,
@@ -28,6 +29,12 @@ type ExtractSuccess<T> = T extends JsonRpcSuccessResponse<infer R> ? R : never;
 export type InferResult<H> = H extends (c: Context<infer _P>) => infer Return
   ? ExtractSuccess<Awaited<Return>>
   : never;
+
+type InferParams<H> = H extends (
+  c: Context<infer P>,
+) => JsonRpcResponse | Promise<JsonRpcResponse>
+  ? P
+  : Record<string, unknown>;
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -51,17 +58,13 @@ export class Fractal<S extends Record<string, unknown> = {}> {
     this.middleware = middleware ?? new MiddlewareRegistry();
   }
 
-  method<
-    TParams extends Record<string, unknown> = Record<string, unknown>,
-    N extends string = string,
-    H extends Handler<TParams> = Handler<TParams>,
-  >(
+  method<N extends string, H extends Handler>(
     name: N,
     handler: H,
-  ): Fractal<S & Record<N, { input: TParams; output: InferResult<H> }>> {
+  ): Fractal<S & Record<N, { input: InferParams<H>; output: InferResult<H> }>> {
     this.router.add(name, handler as (...args: unknown[]) => unknown);
     return new Fractal<
-      S & Record<N, { input: TParams; output: InferResult<H> }>
+      S & Record<N, { input: InferParams<H>; output: InferResult<H> }>
     >(this.router, this.middleware);
   }
 

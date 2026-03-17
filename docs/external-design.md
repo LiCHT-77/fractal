@@ -45,23 +45,19 @@ const app = new Fractal();
 
 #### メソッド
 
-##### `app.method<TParams>(name, handler)`
+##### `app.method(name, handler)`
 
 JSON-RPC method を登録し、route 型情報が追加された新しい App インスタンスを返す（ビルダーパターン）。メソッドチェーンにより `typeof app` から全 route の input/output 型が推論可能になる。
 
 > **注意:** 戻り値のインスタンスは内部の route registry を元のインスタンスと共有する。「新しいインスタンス」は型パラメータの蓄積のためであり、ランタイムの route 登録は共有状態である。チェーン利用（`new Fractal().method(...).method(...)`）を想定しており、途中のインスタンスを分岐して別々に route を登録する使い方はサポートしない。
 
-型パラメータ `TParams` で handler が受け取る `c.req.params` の型を指定する。output 型は handler 内の `c.json()` の引数から自動推論される。ランタイムバリデーションは行わないため、必要な場合は middleware で別途実装する。
+handler の引数 `c` に `Context<TParams>` 型アノテーションを付与することで `c.req.params` の型を指定する。output 型は handler 内の `c.json()` の引数から自動推論される。ランタイムバリデーションは行わないため、必要な場合は middleware で別途実装する。
 
 > **注意:** handler は必ず `c.json()` または `c.error()` の戻り値を return すること。型定義により TypeScript コンパイラがこれを強制する。handler が有効な `JsonRpcResponse` を返さなかった場合（`undefined` を返した場合等）、フレームワークは `-32603 Internal error` を返す。
 
 同一の method 名を複数回登録した場合は `.method()` 呼び出し時に即座にランタイムエラー（`Error: Method "<name>" is already registered`）が throw される。
 
 また、既存の method 名と namespace が衝突する登録も `.method()` 呼び出し時に即座にランタイムエラーとなる。具体的には、既に登録済みの method 名が新しい method 名の namespace 接頭辞（ドット区切りでの祖先）となる場合（またはその逆）にエラーが発生する。例えば `"user"` が登録済みの状態で `"user.get"` を登録しようとした場合、`Error: Method "user.get" conflicts with existing method "user"` が発生する。これはクライアント側で `client.user` が関数とオブジェクトの両方として機能する必要が生じることを防ぐためである。なお、`"user"` と `"username"` のようにドット境界をまたがない文字列一致は衝突とはみなされない。
-
-| 型パラメータ | 制約 | 説明 |
-|---|---|---|
-| `TParams` | `extends Record<string, unknown>` | `c.req.params` の型。省略時は `Record<string, unknown>`（クライアント側で引数オプショナルになる） |
 
 | パラメータ | 型 | 説明 |
 |---|---|---|
@@ -82,19 +78,21 @@ method 名の制約:
 method 名自体またはその先頭セグメント（最初のドットより前の部分）が予約名と一致する場合、`.method()` 呼び出し時にランタイムエラーが throw される。例えば `"then"` や `"then.check"` を登録しようとした場合、`Error: Method "then" conflicts with reserved client property "then"` が発生する。これはクライアント Proxy 上でフレームワークの制御用プロパティと RPC メソッド呼び出しが衝突することを防ぐためである。特に `then` は JavaScript の `await` が対象オブジェクトの `then` プロパティを参照する仕様上、登録を許可すると `await client` 等で意図しない動作が発生する。
 
 > **推奨:** `toString`・`valueOf`・`toJSON` 等の JavaScript 組み込みプロパティ名は、トップレベルセグメントとしての使用を避けること。これらは JavaScript ランタイムが型変換やシリアライズ時に暗黙的にアクセスするため、クライアント Proxy 上で意図しない RPC 呼び出しが発生する可能性がある。クライアント Proxy はこれらのプロパティに対してネイティブの動作を返し、RPC 呼び出しとしては扱わない。Symbol プロパティ（`Symbol.toPrimitive`・`Symbol.iterator`・`Symbol.toStringTag` 等）は一律で RPC 呼び出しとして扱わず、`undefined` を返す。`constructor`・`__proto__` 等のプロトタイプ関連プロパティも同様にネイティブの動作を返す。
-| `handler` | `(c: Context<TParams>) => JsonRpcResponse \| Promise<JsonRpcResponse>` | リクエストハンドラ |
+| `handler` | `(c: Context<TParams>) => JsonRpcResponse \| Promise<JsonRpcResponse>` | リクエストハンドラ。`c` の型アノテーションで `TParams` を指定する |
 
 | 戻り値 | 型 | 説明 |
 |---|---|---|
 | app | `Fractal` | route 型情報が追加された新しい App インスタンス |
 
 ```ts
+import type { Context } from "@licht-77/fractal";
+
 const app = new Fractal()
-  .method<{ id: string }>("user.get", (c) => {
+  .method("user.get", (c: Context<{ id: string }>) => {
     const { id } = c.req.params; // id: string
     return c.json({ id, name: "Alice" }); // output 型は { id: string; name: string } と推論
   })
-  .method<{ name: string }>("user.create", (c) => {
+  .method("user.create", (c: Context<{ name: string }>) => {
     const { name } = c.req.params; // name: string
     return c.json({ success: true }); // output 型は { success: boolean } と推論
   });
@@ -417,8 +415,10 @@ using client = createClient<typeof app>(endpoint);
 
 ```ts
 // worker.ts（サーバー側）
+import type { Context } from "@licht-77/fractal";
+
 const app = new Fractal()
-  .method<{ id: string }>("user.get", (c) => {
+  .method("user.get", (c: Context<{ id: string }>) => {
     const { id } = c.req.params;
     return c.json({ id, name: "Alice" });
   });
@@ -454,14 +454,14 @@ await client.session.login({ token: "abc" });
 await client.admin.user.delete({ id: "456" });
 ```
 
-クライアント側の引数は、サーバー側の `TParams` 指定に応じて必須/オプショナルが切り替わる（Hono の `hc` と同じ設計）。`TParams` に必須キーが存在する場合は引数必須、未指定または空の場合は引数オプショナルとなる。
+クライアント側の引数は、サーバー側の handler の `Context<TParams>` 型アノテーションに応じて必須/オプショナルが切り替わる（Hono の `hc` と同じ設計）。`TParams` に必須キーが存在する場合は引数必須、アノテーション未指定または空の場合は引数オプショナルとなる。
 
 ```ts
-// TParams 未指定 → 引数オプショナル
+// Context<TParams> 未指定 → 引数オプショナル
 await client.ping()
 await client.ping({})
 
-// TParams 指定 → 引数必須
+// Context<{ id: string }> 指定 → 引数必須
 await client.user.get({ id: "123" })
 await client.user.get() // ← 型エラー
 ```
@@ -634,7 +634,7 @@ interface Context<TParams extends Record<string, unknown> = Record<string, unkno
 }
 ```
 
-型パラメータ `TParams` はビルダーチェーン（`app.method()`）の handler 定義から自動推論される。
+型パラメータ `TParams` はビルダーチェーン（`app.method()`）の handler に付与した `Context<TParams>` 型アノテーションから推論される。
 
 | プロパティ | 説明 |
 |---|---|
@@ -679,7 +679,7 @@ middleware チェーン完了後に `c.res` が未設定かつ戻り値も `void
 // ビルダーチェーンにより .method() の呼び出しごとに型パラメータが蓄積される
 type InferRoutes<T extends Fractal> = {
   [Method in RegisteredMethods<T>]: {
-    input: InferInput<T, Method>;   // TParams（ジェネリクスで明示した型）
+    input: InferInput<T, Method>;   // handler の Context<TParams> から推論
     output: InferOutput<T, Method>; // c.json() の引数から推論された型
   };
 };
@@ -687,7 +687,7 @@ type InferRoutes<T extends Fractal> = {
 
 この型は `createClient<typeof app>()` の型パラメータとして使用され、client のメソッド呼び出しに型安全性を付与する。
 
-- `input`: `.method<TParams>()` で指定した型パラメータ `TParams` から取得
+- `input`: handler の `Context<TParams>` 型アノテーションから推論
 - `output`: handler 内の `c.json(data)` の `data` 引数の型から推論
 
 ---
@@ -810,12 +810,13 @@ console.log(user.name); // "Alice"
 **Worker 側:**
 
 ```ts
-import { Fractal } from "fractal";
-import { serve } from "fractal/adapter";
-import { workerEndpoint } from "fractal/endpoint";
+import type { Context } from "@licht-77/fractal";
+import { Fractal } from "@licht-77/fractal";
+import { serve } from "@licht-77/fractal/adapter";
+import { workerEndpoint } from "@licht-77/fractal/endpoint";
 
 const app = new Fractal()
-  .method<{ id: string }>("user.get", (c) => {
+  .method("user.get", (c: Context<{ id: string }>) => {
     const { id } = c.req.params;
     return c.json({ id, name: "Alice" });
   });
@@ -846,12 +847,13 @@ const result = await client.data.fetch({ key: "settings" });
 **iframe 側:**
 
 ```ts
+import type { Context } from "fractal";
 import { Fractal } from "fractal";
 import { serve } from "fractal/adapter";
 import { windowEndpoint } from "fractal/endpoint";
 
 const app = new Fractal()
-  .method<{ key: string }>("data.fetch", (c) => {
+  .method("data.fetch", (c: Context<{ key: string }>) => {
     const { key } = c.req.params;
     return c.json({ key, value: localStorage.getItem(key) });
   });
@@ -867,6 +869,8 @@ serve(app, endpoint);
 ### 6.3 Middleware の活用
 
 ```ts
+import type { Context } from "fractal";
+
 const app = new Fractal()
   // ロギング middleware
   .use(async (c, next) => {
@@ -883,7 +887,7 @@ const app = new Fractal()
     }
     await next();
   })
-  .method<{ token: string }>("admin.delete", (c) => {
+  .method("admin.delete", (c: Context<{ token: string }>) => {
     // 認証済みのリクエストのみ到達
     return c.json({ success: true });
   });
@@ -911,7 +915,7 @@ const channel = new MessageChannel();
 worker.postMessage({ type: "init-push-channel", port: channel.port2 }, [channel.port2]);
 
 const pushApp = new Fractal()
-  .method<{ progress: number }>("task.progress", (c) => {
+  .method("task.progress", (c: Context<{ progress: number }>) => {
     updateProgressBar(c.req.params.progress);
     return c.json({ ok: true });
   });
@@ -938,7 +942,7 @@ const pushClientReady = new Promise<PushClient>((resolve) => {
 });
 
 const app = new Fractal()
-  .method<{ taskId: string }>("task.start", async (c) => {
+  .method("task.start", async (c: Context<{ taskId: string }>) => {
     // push チャネルの初期化完了を待ってから通知
     const pushClient = await pushClientReady;
     pushClient.$notify.task.progress({ progress: 50 });

@@ -1,5 +1,6 @@
 import { createClient } from "./client/proxy.ts";
 import { Fractal } from "./core/app.ts";
+import type { Context } from "./core/context.ts";
 import { createMockEndpoint } from "./test-helpers.ts";
 
 // Compile-time type assertion helper — errors at compile time if T is not assignable to U
@@ -104,12 +105,15 @@ describe("type inference", () => {
 
   // ─── TParams type inference ───
 
-  test("TParams types c.req.params in handler", () => {
-    const typedApp = new Fractal().method<{ id: string }>("user.get", (c) => {
-      // Compile-time: c.req.params.id is string
-      type _ParamsId = Assert<AssertType<typeof c.req.params.id, string>>;
-      return c.json({ id: c.req.params.id });
-    });
+  test("Context<TParams> types c.req.params in handler", () => {
+    const typedApp = new Fractal().method(
+      "user.get",
+      (c: Context<{ id: string }>) => {
+        // Compile-time: c.req.params.id is string
+        type _ParamsId = Assert<AssertType<typeof c.req.params.id, string>>;
+        return c.json({ id: c.req.params.id });
+      },
+    );
 
     const typedClient = createClient<typeof typedApp>(endpoint);
     type _Result = Assert<
@@ -121,9 +125,10 @@ describe("type inference", () => {
     expect(typeof typedClient.user.get).toBe("function");
   });
 
-  test("TParams with required keys makes client params required", () => {
-    const typedApp = new Fractal().method<{ id: string }>("user.get", (c) =>
-      c.json({ id: c.req.params.id }),
+  test("Context<TParams> with required keys makes client params required", () => {
+    const typedApp = new Fractal().method(
+      "user.get",
+      (c: Context<{ id: string }>) => c.json({ id: c.req.params.id }),
     );
 
     const typedClient = createClient<typeof typedApp>(endpoint);
@@ -145,9 +150,9 @@ describe("type inference", () => {
     expect(typeof plainClient.ping).toBe("function");
   });
 
-  test("mixed TParams and no-TParams methods", () => {
+  test("mixed typed and untyped params methods", () => {
     const mixedApp = new Fractal()
-      .method<{ id: string }>("user.get", (c) =>
+      .method("user.get", (c: Context<{ id: string }>) =>
         c.json({ id: c.req.params.id }),
       )
       .method("ping", (c) => c.json("pong"));
@@ -170,9 +175,9 @@ describe("type inference", () => {
     expect(typeof mixedClient.ping).toBe("function");
   });
 
-  test("nested namespace with TParams", () => {
+  test("nested namespace with typed params", () => {
     const nsApp = new Fractal()
-      .method<{ id: string }>("admin.user.get", (c) =>
+      .method("admin.user.get", (c: Context<{ id: string }>) =>
         c.json({ id: c.req.params.id }),
       )
       .method("admin.user.list", (c) => c.json([]));

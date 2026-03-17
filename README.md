@@ -27,12 +27,13 @@ Define methods on the server, call them with full type safety on the client.
 **worker.ts** (server side)
 
 ```ts
+import type { Context } from "@licht-77/fractal";
 import { Fractal } from "@licht-77/fractal";
 import { serve } from "@licht-77/fractal/adapter";
 import { workerEndpoint } from "@licht-77/fractal/endpoint";
 
 const app = new Fractal()
-  .method<{ name: string }>("greet", (c) => {
+  .method("greet", (c: Context<{ name: string }>) => {
     return c.json(`Hello, ${c.req.params.name}!`);
   })
   .method("ping", (c) => {
@@ -136,7 +137,7 @@ try {
 
 ```ts
 class Fractal<S>
-  .method<TParams>(name, handler): Fractal<S & ...>
+  .method(name, handler): Fractal<S & ...>   // handler: (c: Context<TParams>) => ...
   .use(middleware): Fractal<S>
   .use(pattern, middleware): Fractal<S>
 
