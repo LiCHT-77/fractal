@@ -5,7 +5,8 @@ type Next = () => Promise<void>;
 type MiddlewareFn = (
   c: Context,
   next: Next,
-) => JsonRpcResponse | Promise<JsonRpcResponse | undefined> | undefined;
+  // biome-ignore lint/suspicious/noConfusingVoidType: middleware may return void
+) => JsonRpcResponse | Promise<JsonRpcResponse | undefined> | undefined | void;
 
 /**
  * Match a dot-separated pattern against a dot-separated method name.

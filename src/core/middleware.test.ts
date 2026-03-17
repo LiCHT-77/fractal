@@ -1,4 +1,3 @@
-import { test, expect, describe, vi, beforeEach } from "bun:test";
 import { matchPattern, MiddlewareRegistry } from "./middleware.ts";
 
 describe("core/middleware", () => {

@@ -1,4 +1,3 @@
-import { test, expect, describe } from "bun:test";
 import { PARSE_ERROR, INVALID_REQUEST, METHOD_NOT_FOUND, INVALID_PARAMS, INTERNAL_ERROR, RpcError, FractalError, errorToResponse } from "./errors.ts";
 
 describe("protocol/errors", () => {

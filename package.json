@@ -1,14 +1,39 @@
 {
-  "name": "fractal",
+  "name": "@licht-77/fractal",
+  "version": "0.0.1",
   "type": "module",
-  "private": true,
-  "exports": {
-    ".": "./src/index.ts",
-    "./endpoint": "./src/endpoint/index.ts",
-    "./adapter": "./src/adapter/index.ts",
-    "./client": "./src/client/index.ts"
+  "description": "A type-safe JSON-RPC framework",
+  "license": "MIT",
+  "author": "LiCHT-77",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/LiCHT-77/fractal.git"
   },
+  "keywords": ["json-rpc", "rpc", "typescript"],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./endpoint": {
+      "types": "./dist/endpoint/index.d.ts",
+      "import": "./dist/endpoint/index.js"
+    },
+    "./adapter": {
+      "types": "./dist/adapter/index.d.ts",
+      "import": "./dist/adapter/index.js"
+    },
+    "./client": {
+      "types": "./dist/client/index.d.ts",
+      "import": "./dist/client/index.js"
+    }
+  },
+  "files": ["dist", "LICENSE"],
   "scripts": {
+    "build": "rm -rf dist && bun run build:js && bun run build:types",
+    "build:js": "bun build src/index.ts src/endpoint/index.ts src/adapter/index.ts src/client/index.ts --outdir dist --root src --splitting --format esm --target node",
+    "build:types": "tsc -p tsconfig.build.json",
+    "prepublishOnly": "bun run build",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "biome check .",

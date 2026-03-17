@@ -1,4 +1,3 @@
-import { describe, expect, test } from "bun:test";
 import { createClient } from "./client/proxy.ts";
 import { Fractal } from "./core/app.ts";
 import { createMockEndpoint } from "./test-helpers.ts";

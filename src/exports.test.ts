@@ -1,5 +1,3 @@
-import { describe, expect, test } from "bun:test";
-
 describe("barrel exports", () => {
   test("main entry exports core types and classes", async () => {
     const main = await import("./index.ts");
