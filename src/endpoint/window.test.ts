@@ -437,23 +437,32 @@ describe("endpoint/window", () => {
   test("default listener behavior: omitting listener uses globalThis", () => {
     const target = createMockWindow();
 
-    // Temporarily install addEventListener/removeEventListener on globalThis
     const origAdd = globalThis.addEventListener;
     const origRemove = globalThis.removeEventListener;
-    const addSpy = vi.fn(origAdd.bind(globalThis));
-    const removeSpy = vi.fn(origRemove.bind(globalThis));
-    globalThis.addEventListener = addSpy;
-    globalThis.removeEventListener = removeSpy;
+
+    // createMockWindow で dispatchMessage 付きモックを作り、globalThis に設置
+    const mockListener = createMockWindow();
+    globalThis.addEventListener = mockListener.addEventListener as any;
+    globalThis.removeEventListener = mockListener.removeEventListener as any;
 
     try {
       const endpoint = windowEndpoint(target as any, { origin: "*" });
       const handler = vi.fn();
       const dispose = endpoint.onMessage(handler);
 
-      expect(addSpy).toHaveBeenCalledWith("message", expect.any(Function));
+      // addEventListener が globalThis(=mockListener) 経由で呼ばれた
+      expect(mockListener.addEventListener).toHaveBeenCalledWith("message", expect.any(Function));
 
+      // 実際にメッセージをディスパッチしてハンドラに届くことを検証
+      mockListener.dispatchMessage(
+        { jsonrpc: "2.0", method: "test", id: 1 },
+        { origin: "https://example.com", source: target },
+      );
+      expect(handler).toHaveBeenCalledOnce();
+
+      // dispose で removeEventListener が呼ばれる
       dispose();
-      expect(removeSpy).toHaveBeenCalledWith("message", expect.any(Function));
+      expect(mockListener.removeEventListener).toHaveBeenCalledWith("message", expect.any(Function));
     } finally {
       globalThis.addEventListener = origAdd;
       globalThis.removeEventListener = origRemove;
