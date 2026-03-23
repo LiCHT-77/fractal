@@ -1,5 +1,5 @@
 ---
-name: fractal-best-practices
+name: fractal
 description: Best practices for building @licht-77/fractal integrations. Use when implementing JSON-RPC servers/clients with Fractal, setting up endpoints (Worker, iframe, MessagePort, ServiceWorker), middleware, error handling, or type-safe RPC patterns.
 ---
 
