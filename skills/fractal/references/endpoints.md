@@ -69,21 +69,30 @@ The adapter automatically calls `port.start()` when `onMessage` is first registe
 
 ## `serviceWorkerEndpoint(sw, options?)`
 
-For communicating with a ServiceWorker. The handshake (`fractal:connect` / `fractal:ack`) starts immediately in the background via `MessageChannel`. Messages sent before the handshake completes are buffered and flushed in order once acknowledged.
+For communicating with a ServiceWorker. Accepts either a `ServiceWorker` object or a `ServiceWorkerContainer` (`navigator.serviceWorker`). The handshake (`fractal:connect` / `fractal:ack`) starts in the background via `MessageChannel`. Messages sent before the handshake completes are buffered and flushed in order once acknowledged.
+
+When a `ServiceWorkerContainer` is passed, the endpoint internally waits for `container.ready` before initiating the handshake. This avoids the need to manually check `navigator.serviceWorker.controller` on first load.
 
 ```ts
+// Passing ServiceWorker directly (controller must be non-null)
 const endpoint = serviceWorkerEndpoint(navigator.serviceWorker.controller!, {
   timeout: 3000,
 });
+
+// Passing ServiceWorkerContainer (recommended — handles first-load automatically)
+const endpoint = serviceWorkerEndpoint(navigator.serviceWorker, {
+  timeout: 3000,
+});
+
 const client = createClient<AppType>(endpoint);
-await client.greet(); // handshake completes here if not already done
+await client.greet();
 ```
 
 **Options:**
 
 | Option | Type | Default | Description |
 |---|---|---|---|
-| `timeout` | `number` | `undefined` | Timeout in ms for the handshake. After timeout, `send()` throws `FractalError("TIMEOUT")`. |
+| `timeout` | `number` | `undefined` | Timeout in ms for the handshake (including `ready` wait for containers). After timeout, `send()` throws `FractalError("TIMEOUT")`. |
 
 ## `onConnect(callback)`
 

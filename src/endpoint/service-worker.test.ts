@@ -2,6 +2,7 @@ import { FractalError } from "../protocol/errors.ts";
 import {
   createMockMessagePort,
   createMockServiceWorker,
+  createMockServiceWorkerContainer,
   createMockServiceWorkerGlobalScope,
   type MockMessagePort,
   type MockServiceWorkerGlobalScope,
@@ -3215,6 +3216,349 @@ describe("endpoint/service-worker", () => {
       } finally {
         globalThis.MessageChannel = originalMessageChannel;
       }
+    });
+  });
+
+  describe("serviceWorkerEndpoint with ServiceWorkerContainer", () => {
+    let originalMessageChannel: typeof MessageChannel;
+    let capturedChannel:
+      | { port1: MockMessagePort; port2: MockMessagePort }
+      | undefined;
+
+    beforeEach(() => {
+      capturedChannel = undefined;
+      originalMessageChannel = globalThis.MessageChannel;
+      globalThis.MessageChannel = class MockMessageChannel {
+        port1: MockMessagePort;
+        port2: MockMessagePort;
+        constructor() {
+          this.port1 = createMockMessagePort();
+          this.port2 = createMockMessagePort();
+          capturedChannel = this;
+        }
+      } as any;
+    });
+
+    afterEach(() => {
+      globalThis.MessageChannel = originalMessageChannel;
+    });
+
+    // Phase 1: Type discrimination
+
+    test("returns Endpoint synchronously when given a container", () => {
+      const container = createMockServiceWorkerContainer();
+      const endpoint = serviceWorkerEndpoint(container as any);
+      expect(endpoint).not.toBeInstanceOf(Promise);
+      expect(typeof endpoint.send).toBe("function");
+      expect(typeof endpoint.onMessage).toBe("function");
+    });
+
+    test("container with ready does not throw null controller error", () => {
+      const container = createMockServiceWorkerContainer();
+      expect(() => serviceWorkerEndpoint(container as any)).not.toThrow();
+    });
+
+    // Phase 2: Ready resolve → handshake initiation
+
+    test("posts fractal:connect to active worker after container.ready resolves", async () => {
+      const container = createMockServiceWorkerContainer();
+      const sw = createMockServiceWorker();
+      serviceWorkerEndpoint(container as any);
+
+      container._resolveReady({ active: sw as any });
+      await Promise.resolve();
+
+      expect(sw.postMessage).toHaveBeenCalledWith(
+        { type: "fractal:connect" },
+        expect.any(Array),
+      );
+    });
+
+    test("MessageChannel is not created until container.ready resolves", async () => {
+      const container = createMockServiceWorkerContainer();
+      serviceWorkerEndpoint(container as any);
+
+      // Before ready resolves, no MessageChannel should have been created
+      expect(capturedChannel).toBeUndefined();
+
+      const sw = createMockServiceWorker();
+      container._resolveReady({ active: sw as any });
+      await Promise.resolve();
+
+      expect(capturedChannel).toBeDefined();
+    });
+
+    // Phase 3: Buffering
+
+    test("send() before container.ready resolves buffers without throwing", () => {
+      const container = createMockServiceWorkerContainer();
+      const endpoint = serviceWorkerEndpoint(container as any);
+      expect(() => endpoint.send({ jsonrpc: "2.0", method: "ping", id: 1 })).not.toThrow();
+    });
+
+    test("onMessage() before container.ready resolves returns valid unsubscribe", () => {
+      const container = createMockServiceWorkerContainer();
+      const endpoint = serviceWorkerEndpoint(container as any);
+      const handler = vi.fn();
+      const unsub = endpoint.onMessage(handler);
+      expect(typeof unsub).toBe("function");
+    });
+
+    // Phase 4: Ready + ack flush
+
+    test("messages buffered during ready wait are flushed after ready + ack", async () => {
+      const container = createMockServiceWorkerContainer();
+      const sw = createMockServiceWorker();
+      const endpoint = serviceWorkerEndpoint(container as any);
+
+      const msg1 = { jsonrpc: "2.0", method: "a", id: 1 };
+      const msg2 = { jsonrpc: "2.0", method: "b", id: 2 };
+      endpoint.send(msg1);
+      endpoint.send(msg2);
+
+      container._resolveReady({ active: sw as any });
+      await Promise.resolve();
+
+      expect(capturedChannel).toBeDefined();
+      capturedChannel!.port1.dispatchMessage({ type: "fractal:ack" });
+
+      expect(capturedChannel!.port1.postMessage).toHaveBeenCalledWith(msg1);
+      expect(capturedChannel!.port1.postMessage).toHaveBeenCalledWith(msg2);
+    });
+
+    test("onMessage handler registered before ready receives messages after ready + ack", async () => {
+      const container = createMockServiceWorkerContainer();
+      const sw = createMockServiceWorker();
+      const endpoint = serviceWorkerEndpoint(container as any);
+
+      const handler = vi.fn();
+      endpoint.onMessage(handler);
+
+      container._resolveReady({ active: sw as any });
+      await Promise.resolve();
+
+      capturedChannel!.port1.dispatchMessage({ type: "fractal:ack" });
+
+      const msg = { jsonrpc: "2.0", method: "ping", id: 1 };
+      capturedChannel!.port1.dispatchMessage(msg);
+      expect(handler).toHaveBeenCalledWith(
+        msg,
+        expect.objectContaining({ data: msg }),
+      );
+    });
+
+    test("handler unsubscribed during ready wait is not connected after ready + ack", async () => {
+      const container = createMockServiceWorkerContainer();
+      const sw = createMockServiceWorker();
+      const endpoint = serviceWorkerEndpoint(container as any);
+
+      const handler = vi.fn();
+      const unsub = endpoint.onMessage(handler);
+      unsub();
+
+      container._resolveReady({ active: sw as any });
+      await Promise.resolve();
+
+      capturedChannel!.port1.dispatchMessage({ type: "fractal:ack" });
+
+      const msg = { jsonrpc: "2.0", method: "ping", id: 1 };
+      capturedChannel!.port1.dispatchMessage(msg);
+      expect(handler).not.toHaveBeenCalled();
+    });
+
+    // Phase 5: Timeout
+
+    test("send() throws TIMEOUT when timeout elapses during ready wait", async () => {
+      const container = createMockServiceWorkerContainer();
+      const endpoint = serviceWorkerEndpoint(container as any, { timeout: 50 });
+      await new Promise((r) => setTimeout(r, 60));
+      expect(() => endpoint.send({})).toThrow(FractalError);
+      expect(() => endpoint.send({})).toThrow(/TIMEOUT/);
+    });
+
+    test("send() throws TIMEOUT when ready resolves but ack never arrives", async () => {
+      const container = createMockServiceWorkerContainer();
+      const sw = createMockServiceWorker();
+      const endpoint = serviceWorkerEndpoint(container as any, { timeout: 50 });
+
+      container._resolveReady({ active: sw as any });
+      await Promise.resolve();
+
+      await new Promise((r) => setTimeout(r, 60));
+      expect(() => endpoint.send({})).toThrow(FractalError);
+    });
+
+    test("omitting timeout for container means no timeout", async () => {
+      const container = createMockServiceWorkerContainer();
+      const endpoint = serviceWorkerEndpoint(container as any);
+      await new Promise((r) => setTimeout(r, 50));
+      expect(() => endpoint.send({})).not.toThrow();
+    });
+
+    test("Infinity timeout for container means no timeout", async () => {
+      const container = createMockServiceWorkerContainer();
+      const endpoint = serviceWorkerEndpoint(container as any, {
+        timeout: Number.POSITIVE_INFINITY,
+      });
+      await new Promise((r) => setTimeout(r, 50));
+      expect(() => endpoint.send({})).not.toThrow();
+    });
+
+    test("timeout: 0 with container fires immediately", async () => {
+      const container = createMockServiceWorkerContainer();
+      const endpoint = serviceWorkerEndpoint(container as any, { timeout: 0 });
+      await new Promise((r) => setTimeout(r, 10));
+      expect(() => endpoint.send({})).toThrow(FractalError);
+    });
+
+    test("throws TypeError for negative timeout with container", () => {
+      const container = createMockServiceWorkerContainer();
+      expect(() =>
+        serviceWorkerEndpoint(container as any, { timeout: -1 }),
+      ).toThrow(TypeError);
+    });
+
+    test("throws TypeError for NaN timeout with container", () => {
+      const container = createMockServiceWorkerContainer();
+      expect(() =>
+        serviceWorkerEndpoint(container as any, { timeout: Number.NaN }),
+      ).toThrow(TypeError);
+    });
+
+    // Phase 6: active is null
+
+    test("send() throws TIMEOUT when container.ready resolves with null active", async () => {
+      const container = createMockServiceWorkerContainer();
+      const endpoint = serviceWorkerEndpoint(container as any, { timeout: 5000 });
+
+      container._resolveReady({ active: null });
+      await Promise.resolve();
+
+      expect(() => endpoint.send({})).toThrow(FractalError);
+      expect(() => endpoint.send({})).toThrow(/TIMEOUT/);
+    });
+
+    test("onMessage handlers discarded when active is null", async () => {
+      const container = createMockServiceWorkerContainer();
+      const endpoint = serviceWorkerEndpoint(container as any, { timeout: 5000 });
+
+      const handler = vi.fn();
+      endpoint.onMessage(handler);
+
+      container._resolveReady({ active: null });
+      await Promise.resolve();
+
+      // After timedOut, onMessage should return a no-op unsubscribe
+      const handler2 = vi.fn();
+      const unsub = endpoint.onMessage(handler2);
+      expect(typeof unsub).toBe("function");
+    });
+
+    // Phase 7: Edge cases
+
+    test("send() throws TIMEOUT when container.ready rejects", async () => {
+      const container = createMockServiceWorkerContainer();
+      const endpoint = serviceWorkerEndpoint(container as any, { timeout: 5000 });
+
+      container._rejectReady(new Error("registration failed"));
+      await Promise.resolve();
+      // Need an extra microtask for the .catch handler
+      await Promise.resolve();
+
+      expect(() => endpoint.send({})).toThrow(FractalError);
+      expect(() => endpoint.send({})).toThrow(/TIMEOUT/);
+    });
+
+    test("container.ready rejection does not produce unhandled rejection", async () => {
+      const container = createMockServiceWorkerContainer();
+      serviceWorkerEndpoint(container as any);
+
+      // If .catch is not attached, this would produce an unhandled rejection
+      container._rejectReady(new Error("registration failed"));
+      await Promise.resolve();
+      await Promise.resolve();
+      // No assertion needed — if unhandled rejection occurs, the test runner will fail
+    });
+
+    test("late ack after timeout is ignored (container)", async () => {
+      const container = createMockServiceWorkerContainer();
+      const sw = createMockServiceWorker();
+      const endpoint = serviceWorkerEndpoint(container as any, { timeout: 50 });
+
+      container._resolveReady({ active: sw as any });
+      await Promise.resolve();
+
+      // Wait for timeout
+      await new Promise((r) => setTimeout(r, 60));
+
+      // Late ack should not revive the endpoint
+      if (capturedChannel) {
+        capturedChannel.port1.dispatchMessage({ type: "fractal:ack" });
+      }
+
+      expect(() => endpoint.send({})).toThrow(FractalError);
+    });
+
+    test("ready resolving after timeout does not initiate handshake", async () => {
+      const container = createMockServiceWorkerContainer();
+      const sw = createMockServiceWorker();
+      serviceWorkerEndpoint(container as any, { timeout: 50 });
+
+      // Wait for timeout
+      await new Promise((r) => setTimeout(r, 60));
+
+      // Now resolve ready — should not initiate handshake
+      container._resolveReady({ active: sw as any });
+      await Promise.resolve();
+
+      expect(sw.postMessage).not.toHaveBeenCalled();
+    });
+
+    test("multiple containers create independent endpoints", async () => {
+      const container1 = createMockServiceWorkerContainer();
+      const container2 = createMockServiceWorkerContainer();
+      const sw1 = createMockServiceWorker();
+      const sw2 = createMockServiceWorker();
+
+      const capturedChannels: {
+        port1: MockMessagePort;
+        port2: MockMessagePort;
+      }[] = [];
+      globalThis.MessageChannel = class MockMessageChannel {
+        port1: MockMessagePort;
+        port2: MockMessagePort;
+        constructor() {
+          this.port1 = createMockMessagePort();
+          this.port2 = createMockMessagePort();
+          capturedChannels.push(this);
+        }
+      } as any;
+
+      const endpoint1 = serviceWorkerEndpoint(container1 as any);
+      const endpoint2 = serviceWorkerEndpoint(container2 as any);
+
+      container1._resolveReady({ active: sw1 as any });
+      container2._resolveReady({ active: sw2 as any });
+      await Promise.resolve();
+
+      expect(capturedChannels.length).toBe(2);
+
+      capturedChannels[0].port1.dispatchMessage({ type: "fractal:ack" });
+      capturedChannels[1].port1.dispatchMessage({ type: "fractal:ack" });
+
+      expect(endpoint1).not.toBe(endpoint2);
+
+      endpoint1.send({ jsonrpc: "2.0", method: "a", id: 1 });
+      expect(capturedChannels[0].port1.postMessage).toHaveBeenCalledWith({
+        jsonrpc: "2.0",
+        method: "a",
+        id: 1,
+      });
+      expect(capturedChannels[1].port1.postMessage).not.toHaveBeenCalledWith({
+        jsonrpc: "2.0",
+        method: "a",
+        id: 1,
+      });
     });
   });
 });

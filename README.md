@@ -75,11 +75,11 @@ client.dispose();
 | `workerEndpoint(worker)` | Worker / SharedWorker port | `@licht-77/fractal/endpoint` |
 | `windowEndpoint(window, options?)` | iframe / popup Window | `@licht-77/fractal/endpoint` |
 | `messagePortEndpoint(port)` | MessagePort | `@licht-77/fractal/endpoint` |
-| `serviceWorkerEndpoint(sw, options?)` | ServiceWorker (client side) | `@licht-77/fractal/endpoint` |
+| `serviceWorkerEndpoint(sw, options?)` | ServiceWorker / ServiceWorkerContainer | `@licht-77/fractal/endpoint` |
 | `onConnect(callback)` | ServiceWorker (inside SW) | `@licht-77/fractal/endpoint` |
 
 `windowEndpoint` accepts `{ origin?: string; listener?: EventTarget }`.
-`serviceWorkerEndpoint` returns an `Endpoint` synchronously and accepts `{ timeout?: number }`. The handshake runs in the background; messages are buffered until it completes.
+`serviceWorkerEndpoint` accepts a `ServiceWorker` or `ServiceWorkerContainer` (`navigator.serviceWorker`) and returns an `Endpoint` synchronously. Options: `{ timeout?: number }`. The handshake runs in the background; messages are buffered until it completes.
 
 ## Middleware
 

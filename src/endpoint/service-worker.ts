@@ -71,8 +71,75 @@ function createPortEndpoint(port: MessagePortLike): Endpoint {
   };
 }
 
+interface ServiceWorkerLike {
+  postMessage(message: unknown, transfer?: Transferable[]): void;
+}
+
+interface ServiceWorkerContainerLike {
+  ready: Promise<{ active: ServiceWorkerLike | null }>;
+}
+
+function isContainer(sw: unknown): sw is ServiceWorkerContainerLike {
+  return sw != null && typeof sw === "object" && "ready" in sw;
+}
+
+function initHandshake(
+  worker: ServiceWorkerLike,
+  sendBuffer: unknown[],
+  pendingHandlers: Array<{
+    handler: (message: unknown, event: MessageEvent) => void;
+    active: boolean;
+  }>,
+  timerId: ReturnType<typeof setTimeout> | undefined,
+  timedOutRef: { value: boolean },
+  realEndpointRef: { value: Endpoint | undefined },
+): void {
+  const channel = new MessageChannel();
+  const port = channel.port1;
+
+  const ackListener = (event: MessageEvent): void => {
+    const { data } = event;
+    if (
+      data !== null &&
+      typeof data === "object" &&
+      (data as Record<string, unknown>).type === "fractal:ack"
+    ) {
+      if (timedOutRef.value) return;
+
+      if (timerId !== undefined) {
+        clearTimeout(timerId);
+      }
+      port.removeEventListener("message", ackListener);
+
+      const endpoint = createPortEndpoint(port as unknown as MessagePortLike);
+      realEndpointRef.value = endpoint;
+
+      // Connect pending handlers
+      for (const entry of pendingHandlers) {
+        if (entry.active) {
+          endpoint.onMessage(entry.handler);
+        }
+      }
+      pendingHandlers.length = 0;
+
+      // Flush buffered messages
+      for (const msg of sendBuffer) {
+        endpoint.send(msg);
+      }
+      sendBuffer.length = 0;
+    }
+  };
+
+  port.addEventListener("message", ackListener);
+  port.start();
+
+  worker.postMessage({ type: "fractal:connect" }, [
+    channel.port2 as unknown as Transferable,
+  ]);
+}
+
 export function serviceWorkerEndpoint(
-  sw: { postMessage(message: unknown, transfer?: Transferable[]): void },
+  sw: ServiceWorkerLike | ServiceWorkerContainerLike,
   options?: ServiceWorkerEndpointOptions,
 ): Endpoint {
   if (sw == null) {
@@ -93,78 +160,73 @@ export function serviceWorkerEndpoint(
     active: boolean;
   }> = [];
 
-  let realEndpoint: Endpoint | undefined;
-  let timedOut = false;
-
-  const channel = new MessageChannel();
-  const port = channel.port1;
-
-  const ackListener = (event: MessageEvent): void => {
-    const { data } = event;
-    if (
-      data !== null &&
-      typeof data === "object" &&
-      (data as Record<string, unknown>).type === "fractal:ack"
-    ) {
-      if (timerId !== undefined) {
-        clearTimeout(timerId);
-      }
-      port.removeEventListener("message", ackListener);
-
-      realEndpoint = createPortEndpoint(port as unknown as MessagePortLike);
-
-      // Connect pending handlers
-      for (const entry of pendingHandlers) {
-        if (entry.active) {
-          realEndpoint.onMessage(entry.handler);
-        }
-      }
-      pendingHandlers.length = 0;
-
-      // Flush buffered messages
-      for (const msg of sendBuffer) {
-        realEndpoint.send(msg);
-      }
-      sendBuffer.length = 0;
-    }
-  };
-
-  port.addEventListener("message", ackListener);
-  port.start();
+  const realEndpointRef: { value: Endpoint | undefined } = { value: undefined };
+  const timedOutRef = { value: false };
 
   let timerId: ReturnType<typeof setTimeout> | undefined;
 
   if (timeout !== undefined && timeout !== Number.POSITIVE_INFINITY) {
     timerId = setTimeout(() => {
-      port.removeEventListener("message", ackListener);
-      timedOut = true;
+      timedOutRef.value = true;
       sendBuffer.length = 0;
       pendingHandlers.length = 0;
     }, timeout);
   }
 
-  try {
-    sw.postMessage({ type: "fractal:connect" }, [
-      channel.port2 as unknown as Transferable,
-    ]);
-  } catch (err) {
-    if (timerId !== undefined) {
-      clearTimeout(timerId);
+  if (isContainer(sw)) {
+    // Container path: wait for ready, then initiate handshake
+    sw.ready
+      .then((reg) => {
+        if (timedOutRef.value) return;
+        if (reg.active == null) {
+          timedOutRef.value = true;
+          sendBuffer.length = 0;
+          pendingHandlers.length = 0;
+          return;
+        }
+        initHandshake(
+          reg.active,
+          sendBuffer,
+          pendingHandlers,
+          timerId,
+          timedOutRef,
+          realEndpointRef,
+        );
+      })
+      .catch(() => {
+        timedOutRef.value = true;
+        sendBuffer.length = 0;
+        pendingHandlers.length = 0;
+      });
+  } else {
+    // Direct ServiceWorker path
+    try {
+      initHandshake(
+        sw,
+        sendBuffer,
+        pendingHandlers,
+        timerId,
+        timedOutRef,
+        realEndpointRef,
+      );
+    } catch (err) {
+      if (timerId !== undefined) {
+        clearTimeout(timerId);
+      }
+      timedOutRef.value = true;
+      sendBuffer.length = 0;
+      pendingHandlers.length = 0;
+      throw err;
     }
-    port.removeEventListener("message", ackListener);
-    timedOut = true;
-    sendBuffer.length = 0;
-    pendingHandlers.length = 0;
-    throw err;
   }
 
   return {
     send(message: unknown): void {
-      if (realEndpoint) {
-        realEndpoint.send(message);
+      if (realEndpointRef.value) {
+        realEndpointRef.value.send(message);
         return;
       }
-      if (timedOut) {
+      if (timedOutRef.value) {
         throw new FractalError("TIMEOUT");
       }
       sendBuffer.push(message);
@@ -172,8 +234,8 @@ export function serviceWorkerEndpoint(
     onMessage(
       handler: (message: unknown, event: MessageEvent) => void,
     ): () => void {
-      if (realEndpoint) {
-        return realEndpoint.onMessage(handler);
+      if (realEndpointRef.value) {
+        return realEndpointRef.value.onMessage(handler);
       }
       const entry = { handler, active: true };
       pendingHandlers.push(entry);

@@ -253,6 +253,26 @@ export function createMockServiceWorker(): MockServiceWorker {
   };
 }
 
+// ─── ServiceWorkerContainer Mock ───
+
+export interface MockServiceWorkerContainer {
+  ready: Promise<{ active: MockServiceWorker | null }>;
+  _resolveReady: (reg: { active: MockServiceWorker | null }) => void;
+  _rejectReady: (error: Error) => void;
+}
+
+export function createMockServiceWorkerContainer(): MockServiceWorkerContainer {
+  let resolveReady!: (reg: { active: MockServiceWorker | null }) => void;
+  let rejectReady!: (error: Error) => void;
+  const ready = new Promise<{ active: MockServiceWorker | null }>(
+    (resolve, reject) => {
+      resolveReady = resolve;
+      rejectReady = reject;
+    },
+  );
+  return { ready, _resolveReady: resolveReady, _rejectReady: rejectReady };
+}
+
 // ─── ServiceWorkerGlobalScope Mock ───
 
 export interface MockServiceWorkerGlobalScope {
