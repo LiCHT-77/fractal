@@ -19,7 +19,7 @@ import {
 | `workerEndpoint(worker)` | Dedicated Worker or SharedWorker |
 | `windowEndpoint(window, options?)` | iframe, popup, or parent window |
 | `messagePortEndpoint(port)` | `MessagePort` (from `MessageChannel`, etc.) |
-| `serviceWorkerEndpoint(sw, options?)` | ServiceWorker (async — returns `Promise<Endpoint>`) |
+| `serviceWorkerEndpoint(sw, options?)` | ServiceWorker (handshake runs in background) |
 | `onConnect(callback)` | Inside a SharedWorker to accept connections |
 
 ## `workerEndpoint(worker)`
@@ -69,19 +69,21 @@ The adapter automatically calls `port.start()` when `onMessage` is first registe
 
 ## `serviceWorkerEndpoint(sw, options?)`
 
-For communicating with a ServiceWorker. This is **async** because it performs a handshake via `MessageChannel`:
+For communicating with a ServiceWorker. The handshake (`fractal:connect` / `fractal:ack`) starts immediately in the background via `MessageChannel`. Messages sent before the handshake completes are buffered and flushed in order once acknowledged.
 
 ```ts
-const endpoint = await serviceWorkerEndpoint(navigator.serviceWorker.controller!, {
+const endpoint = serviceWorkerEndpoint(navigator.serviceWorker.controller!, {
   timeout: 3000,
 });
+const client = createClient<AppType>(endpoint);
+await client.greet(); // handshake completes here if not already done
 ```
 
 **Options:**
 
 | Option | Type | Default | Description |
 |---|---|---|---|
-| `timeout` | `number` | `undefined` | Timeout in ms for the initial handshake. Rejects with `FractalError("TIMEOUT")` if exceeded. |
+| `timeout` | `number` | `undefined` | Timeout in ms for the handshake. After timeout, `send()` throws `FractalError("TIMEOUT")`. |
 
 ## `onConnect(callback)`
 

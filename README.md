@@ -79,7 +79,7 @@ client.dispose();
 | `onConnect(callback)` | ServiceWorker (inside SW) | `@licht-77/fractal/endpoint` |
 
 `windowEndpoint` accepts `{ origin?: string; listener?: EventTarget }`.
-`serviceWorkerEndpoint` returns a `Promise<Endpoint>` and accepts `{ timeout?: number }`.
+`serviceWorkerEndpoint` returns an `Endpoint` synchronously and accepts `{ timeout?: number }`. The handshake runs in the background; messages are buffered until it completes.
 
 ## Middleware
 
@@ -171,7 +171,7 @@ class FractalError extends Error { code: "TIMEOUT" | "DISPOSED" }
 workerEndpoint(worker): Endpoint
 windowEndpoint(target, options?): Endpoint
 messagePortEndpoint(port): Endpoint
-serviceWorkerEndpoint(sw, options?): Promise<Endpoint>
+serviceWorkerEndpoint(sw, options?): Endpoint
 onConnect(callback: (endpoint: Endpoint) => void): void
 ```
 
