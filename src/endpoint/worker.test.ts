@@ -1,5 +1,5 @@
-import { workerEndpoint } from "./worker.ts";
 import { createMockWorker } from "../test-helpers.ts";
+import { workerEndpoint } from "./worker.ts";
 
 describe("endpoint/worker", () => {
   test("send() calls target.postMessage", () => {
@@ -20,7 +20,10 @@ describe("endpoint/worker", () => {
 
     const handler = vi.fn();
     endpoint.onMessage(handler);
-    expect(worker.addEventListener).toHaveBeenCalledWith("message", expect.any(Function));
+    expect(worker.addEventListener).toHaveBeenCalledWith(
+      "message",
+      expect.any(Function),
+    );
   });
 
   test("onMessage ignores non-JSON-RPC messages", () => {
@@ -62,7 +65,10 @@ describe("endpoint/worker", () => {
     const handler = vi.fn();
     const dispose = endpoint.onMessage(handler);
     dispose();
-    expect(worker.removeEventListener).toHaveBeenCalledWith("message", expect.any(Function));
+    expect(worker.removeEventListener).toHaveBeenCalledWith(
+      "message",
+      expect.any(Function),
+    );
   });
 
   test("works with DedicatedWorkerGlobalScope (self)", () => {
@@ -127,7 +133,10 @@ describe("endpoint/worker", () => {
 
     const msg = { jsonrpc: "2.0", method: "ping", id: 1 };
     worker.dispatchMessage(msg);
-    expect(handler).toHaveBeenCalledWith(msg, expect.objectContaining({ data: msg }));
+    expect(handler).toHaveBeenCalledWith(
+      msg,
+      expect.objectContaining({ data: msg }),
+    );
   });
 
   test("ignores message with jsonrpc !== '2.0'", () => {
@@ -361,7 +370,10 @@ describe("endpoint/worker", () => {
     endpoint.onMessage(handler);
     const response = { jsonrpc: "2.0", result: "pong", id: 1 };
     worker.dispatchMessage(response);
-    expect(handler).toHaveBeenCalledWith(response, expect.objectContaining({ data: response }));
+    expect(handler).toHaveBeenCalledWith(
+      response,
+      expect.objectContaining({ data: response }),
+    );
   });
 
   test("DedicatedWorkerGlobalScope target: send and onMessage work end-to-end", () => {
@@ -378,14 +390,25 @@ describe("endpoint/worker", () => {
     // receive a request from main thread
     const handler = vi.fn();
     endpoint.onMessage(handler);
-    const request = { jsonrpc: "2.0", method: "compute", params: { x: 10 }, id: 42 };
+    const request = {
+      jsonrpc: "2.0",
+      method: "compute",
+      params: { x: 10 },
+      id: 42,
+    };
     selfScope.dispatchMessage(request);
-    expect(handler).toHaveBeenCalledWith(request, expect.objectContaining({ data: request }));
+    expect(handler).toHaveBeenCalledWith(
+      request,
+      expect.objectContaining({ data: request }),
+    );
 
     // dispose works the same way
     const dispose = endpoint.onMessage(vi.fn());
     dispose();
-    expect(selfScope.removeEventListener).toHaveBeenCalledWith("message", expect.any(Function));
+    expect(selfScope.removeEventListener).toHaveBeenCalledWith(
+      "message",
+      expect.any(Function),
+    );
   });
 
   // ─── G. Large payload ───
@@ -469,7 +492,12 @@ describe("endpoint/worker", () => {
     const handler = vi.fn();
     endpoint.onMessage(handler);
 
-    const msg = { jsonrpc: "2.0", method: "check", params: { key: "abc" }, id: 7 };
+    const msg = {
+      jsonrpc: "2.0",
+      method: "check",
+      params: { key: "abc" },
+      id: 7,
+    };
     worker.dispatchMessage(msg);
 
     expect(handler).toHaveBeenCalledTimes(1);
@@ -688,8 +716,12 @@ describe("endpoint/worker", () => {
       throw new DOMException("Worker terminated");
     });
 
-    expect(() => endpoint.send({ jsonrpc: "2.0", method: "a", id: 1 })).toThrow("Worker terminated");
-    expect(() => endpoint.send({ jsonrpc: "2.0", method: "b", id: 2 })).toThrow("Worker terminated");
+    expect(() => endpoint.send({ jsonrpc: "2.0", method: "a", id: 1 })).toThrow(
+      "Worker terminated",
+    );
+    expect(() => endpoint.send({ jsonrpc: "2.0", method: "b", id: 2 })).toThrow(
+      "Worker terminated",
+    );
   });
 
   test("onMessage handler still works after send() throws due to terminated worker", () => {
@@ -705,7 +737,9 @@ describe("endpoint/worker", () => {
       throw new DOMException("Worker terminated");
     });
 
-    expect(() => endpoint.send({ jsonrpc: "2.0", method: "a", id: 1 })).toThrow();
+    expect(() =>
+      endpoint.send({ jsonrpc: "2.0", method: "a", id: 1 }),
+    ).toThrow();
 
     // But onMessage handler should still be registered and callable
     // (In practice, a terminated worker won't dispatch messages, but the listener is not removed)
@@ -806,7 +840,9 @@ describe("endpoint/worker", () => {
     const endpoint = workerEndpoint(worker as any);
 
     // send() should accept one argument without error
-    expect(() => endpoint.send({ jsonrpc: "2.0", method: "ping", id: 1 })).not.toThrow();
+    expect(() =>
+      endpoint.send({ jsonrpc: "2.0", method: "ping", id: 1 }),
+    ).not.toThrow();
   });
 
   test("onMessage function returns a function (dispose)", () => {
@@ -884,6 +920,9 @@ describe("endpoint/worker", () => {
     worker.dispatchMessage(msg);
 
     expect(handler).toHaveBeenCalledTimes(1);
-    expect(handler).toHaveBeenCalledWith(msg, expect.objectContaining({ data: msg }));
+    expect(handler).toHaveBeenCalledWith(
+      msg,
+      expect.objectContaining({ data: msg }),
+    );
   });
 });

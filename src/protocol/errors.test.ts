@@ -1,4 +1,13 @@
-import { PARSE_ERROR, INVALID_REQUEST, METHOD_NOT_FOUND, INVALID_PARAMS, INTERNAL_ERROR, RpcError, FractalError, errorToResponse } from "./errors.ts";
+import {
+  errorToResponse,
+  FractalError,
+  INTERNAL_ERROR,
+  INVALID_PARAMS,
+  INVALID_REQUEST,
+  METHOD_NOT_FOUND,
+  PARSE_ERROR,
+  RpcError,
+} from "./errors.ts";
 
 describe("protocol/errors", () => {
   test("PARSE_ERROR is -32700", () => {
@@ -182,7 +191,9 @@ describe("protocol/errors", () => {
     });
 
     test("RpcError accepts code -32050 (mid reserved range)", () => {
-      const err = new RpcError(-32050, "Custom server error", { reason: "overloaded" });
+      const err = new RpcError(-32050, "Custom server error", {
+        reason: "overloaded",
+      });
       expect(err.code).toBe(-32050);
       expect(err.data).toEqual({ reason: "overloaded" });
     });
@@ -236,7 +247,9 @@ describe("protocol/errors", () => {
     });
 
     test("FractalError is in the Error prototype chain", () => {
-      expect(Object.getPrototypeOf(FractalError.prototype)).toBe(Error.prototype);
+      expect(Object.getPrototypeOf(FractalError.prototype)).toBe(
+        Error.prototype,
+      );
     });
   });
 
@@ -773,7 +786,10 @@ describe("protocol/errors", () => {
     });
 
     test("RpcError with complex data object → response.error has no data property", () => {
-      const err = new RpcError(-32602, "Bad params", { nested: { a: 1 }, list: [1, 2] });
+      const err = new RpcError(-32602, "Bad params", {
+        nested: { a: 1 },
+        list: [1, 2],
+      });
       const response = errorToResponse(err, 5);
       expect("data" in response.error).toBe(false);
     });
@@ -814,7 +830,10 @@ describe("protocol/errors", () => {
   describe("errorToResponse normalizes undefined id to null", () => {
     test("id=undefined is normalized to null in the response", () => {
       // c.req.id can be undefined for notifications; errorToResponse should normalize to null
-      const response = errorToResponse(new Error("fail"), undefined as unknown as null);
+      const response = errorToResponse(
+        new Error("fail"),
+        undefined as unknown as null,
+      );
       expect(response.id).toBeNull();
     });
 

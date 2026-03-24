@@ -1,5 +1,5 @@
+import { makeNotification, makeRequest } from "../test-helpers.ts";
 import { Fractal } from "./app.ts";
-import { makeRequest, makeNotification } from "../test-helpers.ts";
 
 describe("core/app (Fractal class)", () => {
   // ─── Constructor & builder pattern ───
@@ -16,7 +16,9 @@ describe("core/app (Fractal class)", () => {
     });
 
     test(".use() returns a Fractal instance (builder pattern)", () => {
-      const app = new Fractal().use(async (_c, next) => { await next(); });
+      const app = new Fractal().use(async (_c, next) => {
+        await next();
+      });
       expect(app).toBeInstanceOf(Fractal);
     });
 
@@ -26,8 +28,12 @@ describe("core/app (Fractal class)", () => {
         .method("b", (c) => c.json(2));
 
       // Both methods should be callable via dispatch
-      expect(app.dispatch(makeRequest("a", {}, 1))).resolves.toMatchObject({ result: 1 });
-      expect(app.dispatch(makeRequest("b", {}, 2))).resolves.toMatchObject({ result: 2 });
+      expect(app.dispatch(makeRequest("a", {}, 1))).resolves.toMatchObject({
+        result: 1,
+      });
+      expect(app.dispatch(makeRequest("b", {}, 2))).resolves.toMatchObject({
+        result: 2,
+      });
     });
   });
 
@@ -76,7 +82,9 @@ describe("core/app (Fractal class)", () => {
     test("throws on duplicate method name", () => {
       const app = new Fractal();
       app.method("ping", (c) => c.json("pong"));
-      expect(() => app.method("ping", (c) => c.json("pong2"))).toThrow(/already registered/);
+      expect(() => app.method("ping", (c) => c.json("pong2"))).toThrow(
+        /already registered/,
+      );
     });
 
     test('throws with exact message: Method "<name>" is already registered', () => {
@@ -87,7 +95,7 @@ describe("core/app (Fractal class)", () => {
       );
     });
 
-    test('exact duplicate error message includes the method name for namespaced methods', () => {
+    test("exact duplicate error message includes the method name for namespaced methods", () => {
       const app = new Fractal();
       app.method("user.get", (c) => c.json("ok"));
       expect(() => app.method("user.get", (c) => c.json("ok2"))).toThrow(
@@ -102,13 +110,17 @@ describe("core/app (Fractal class)", () => {
     test("throws when leaf conflicts with namespace", () => {
       const app = new Fractal();
       app.method("user.get", (c) => c.json("ok"));
-      expect(() => app.method("user", (c) => c.json("ok"))).toThrow(/conflicts/);
+      expect(() => app.method("user", (c) => c.json("ok"))).toThrow(
+        /conflicts/,
+      );
     });
 
     test("throws when namespace extends existing leaf", () => {
       const app = new Fractal();
       app.method("user", (c) => c.json("ok"));
-      expect(() => app.method("user.get", (c) => c.json("ok"))).toThrow(/conflicts/);
+      expect(() => app.method("user.get", (c) => c.json("ok"))).toThrow(
+        /conflicts/,
+      );
     });
 
     test('exact conflict message: Method "user.get" conflicts with existing method "user"', () => {
@@ -133,12 +145,16 @@ describe("core/app (Fractal class)", () => {
   describe("reserved name detection", () => {
     test("rejects '$notify'", () => {
       const app = new Fractal();
-      expect(() => app.method("$notify", (c) => c.json("ok"))).toThrow(/reserved/);
+      expect(() => app.method("$notify", (c) => c.json("ok"))).toThrow(
+        /reserved/,
+      );
     });
 
     test("rejects 'dispose'", () => {
       const app = new Fractal();
-      expect(() => app.method("dispose", (c) => c.json("ok"))).toThrow(/reserved/);
+      expect(() => app.method("dispose", (c) => c.json("ok"))).toThrow(
+        /reserved/,
+      );
     });
 
     test("rejects 'then'", () => {
@@ -148,7 +164,9 @@ describe("core/app (Fractal class)", () => {
 
     test("rejects 'then.check'", () => {
       const app = new Fractal();
-      expect(() => app.method("then.check", (c) => c.json("ok"))).toThrow(/reserved/);
+      expect(() => app.method("then.check", (c) => c.json("ok"))).toThrow(
+        /reserved/,
+      );
     });
 
     test('exact reserved message: Method "then" conflicts with reserved client property "then"', () => {
@@ -195,7 +213,9 @@ describe("core/app (Fractal class)", () => {
 
     test("passes params to handler via context", async () => {
       const app = new Fractal().method("echo", (c) => c.json(c.req.params));
-      const response = await app.dispatch(makeRequest("echo", { hello: "world" }, 1));
+      const response = await app.dispatch(
+        makeRequest("echo", { hello: "world" }, 1),
+      );
       expect(response).toMatchObject({ result: { hello: "world" } });
     });
 
@@ -214,7 +234,11 @@ describe("core/app (Fractal class)", () => {
       );
       const response = await app.dispatch(makeRequest("fail", {}, 1));
       expect(response).toMatchObject({
-        error: { code: -32000, message: "Custom error", data: { detail: "test" } },
+        error: {
+          code: -32000,
+          message: "Custom error",
+          data: { detail: "test" },
+        },
       });
     });
 
@@ -235,7 +259,9 @@ describe("core/app (Fractal class)", () => {
       const response1 = await app.dispatch(makeRequest("ユーザー.取得", {}, 1));
       expect(response1).toMatchObject({ result: "found", id: 1 });
 
-      const response2 = await app.dispatch(makeRequest("my-service.health-check", {}, 2));
+      const response2 = await app.dispatch(
+        makeRequest("my-service.health-check", {}, 2),
+      );
       expect(response2).toMatchObject({ result: "healthy", id: 2 });
     });
 
@@ -254,11 +280,10 @@ describe("core/app (Fractal class)", () => {
 
   describe("concurrent dispatch", () => {
     test("multiple concurrent dispatch calls execute independently", async () => {
-      const app = new Fractal()
-        .method("slow", async (c) => {
-          await new Promise((resolve) => setTimeout(resolve, 10));
-          return c.json(c.req.params.value);
-        });
+      const app = new Fractal().method("slow", async (c) => {
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        return c.json(c.req.params.value);
+      });
 
       const [r1, r2, r3] = await Promise.all([
         app.dispatch(makeRequest("slow", { value: "a" }, 1)),
@@ -277,7 +302,11 @@ describe("core/app (Fractal class)", () => {
   describe("dispatch params handling", () => {
     test("normalizes undefined params to {}", async () => {
       const app = new Fractal().method("ping", (c) => c.json(c.req.params));
-      const response = await app.dispatch({ jsonrpc: "2.0", method: "ping", id: 1 });
+      const response = await app.dispatch({
+        jsonrpc: "2.0",
+        method: "ping",
+        id: 1,
+      });
       expect(response).toMatchObject({ result: {} });
     });
 
@@ -327,7 +356,9 @@ describe("core/app (Fractal class)", () => {
     });
 
     test("invalid array params triggers console.error", async () => {
-      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
       const app = new Fractal().method("ping", (c) => c.json("pong"));
       await app.dispatch({
         jsonrpc: "2.0",
@@ -373,13 +404,17 @@ describe("core/app (Fractal class)", () => {
         capturedId = c.req.id;
         return c.json("ok");
       });
-      const result = await app.dispatch(makeNotification("log", { msg: "hello" }));
+      const result = await app.dispatch(
+        makeNotification("log", { msg: "hello" }),
+      );
       expect(result).toBeUndefined();
       expect(capturedId).toBeUndefined();
     });
 
     test("handler throwing during notification outputs error to console.error", async () => {
-      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
       const app = new Fractal().method("boom", () => {
         throw new Error("notification failure");
       });
@@ -400,7 +435,9 @@ describe("core/app (Fractal class)", () => {
     });
 
     test("notification with invalid array params returns void and logs to console.error", async () => {
-      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
       const app = new Fractal().method("ping", (c) => c.json("pong"));
       const result = await app.dispatch({
         jsonrpc: "2.0",
@@ -413,7 +450,9 @@ describe("core/app (Fractal class)", () => {
     });
 
     test("middleware throwing during notification returns void and logs to console.error", async () => {
-      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
       const app = new Fractal()
         .use(async (_c, _next) => {
           throw new Error("middleware notification failure");
@@ -487,7 +526,10 @@ describe("core/app (Fractal class)", () => {
     test("global middleware runs for all methods", async () => {
       const spy = vi.fn();
       const app = new Fractal()
-        .use(async (_c, next) => { spy(); await next(); })
+        .use(async (_c, next) => {
+          spy();
+          await next();
+        })
         .method("a", (c) => c.json("a"))
         .method("b", (c) => c.json("b"));
 
@@ -499,7 +541,10 @@ describe("core/app (Fractal class)", () => {
     test('.use("*", middleware) matches single-segment methods only', async () => {
       const spy = vi.fn();
       const app = new Fractal()
-        .use("*", async (_c, next) => { spy(); await next(); })
+        .use("*", async (_c, next) => {
+          spy();
+          await next();
+        })
         .method("ping", (c) => c.json("pong"))
         .method("user.get", (c) => c.json("user"));
 
@@ -513,7 +558,10 @@ describe("core/app (Fractal class)", () => {
     test('.use("**", middleware) matches all methods (equivalent to global)', async () => {
       const spy = vi.fn();
       const app = new Fractal()
-        .use("**", async (_c, next) => { spy(); await next(); })
+        .use("**", async (_c, next) => {
+          spy();
+          await next();
+        })
         .method("ping", (c) => c.json("pong"))
         .method("user.get", (c) => c.json("user"))
         .method("admin.user.delete", (c) => c.json("deleted"));
@@ -527,7 +575,10 @@ describe("core/app (Fractal class)", () => {
     test('.use("admin.*", middleware) matches admin.X but not admin.X.Y', async () => {
       const spy = vi.fn();
       const app = new Fractal()
-        .use("admin.*", async (_c, next) => { spy(); await next(); })
+        .use("admin.*", async (_c, next) => {
+          spy();
+          await next();
+        })
         .method("admin.delete", (c) => c.json("deleted"))
         .method("admin.user.delete", (c) => c.json("deep-deleted"));
 
@@ -541,7 +592,10 @@ describe("core/app (Fractal class)", () => {
     test('.use("admin.**", middleware) matches admin.X and admin.X.Y', async () => {
       const spy = vi.fn();
       const app = new Fractal()
-        .use("admin.**", async (_c, next) => { spy(); await next(); })
+        .use("admin.**", async (_c, next) => {
+          spy();
+          await next();
+        })
         .method("admin.delete", (c) => c.json("deleted"))
         .method("admin.user.delete", (c) => c.json("deep-deleted"));
 
@@ -555,7 +609,10 @@ describe("core/app (Fractal class)", () => {
     test('.use("*.get", middleware) matches X.get but not X.Y.get', async () => {
       const spy = vi.fn();
       const app = new Fractal()
-        .use("*.get", async (_c, next) => { spy(); await next(); })
+        .use("*.get", async (_c, next) => {
+          spy();
+          await next();
+        })
         .method("user.get", (c) => c.json("user"))
         .method("user.detail.get", (c) => c.json("detail"));
 
@@ -569,7 +626,10 @@ describe("core/app (Fractal class)", () => {
     test('.use("**.get", middleware) matches X.get and X.Y.get', async () => {
       const spy = vi.fn();
       const app = new Fractal()
-        .use("**.get", async (_c, next) => { spy(); await next(); })
+        .use("**.get", async (_c, next) => {
+          spy();
+          await next();
+        })
         .method("user.get", (c) => c.json("user"))
         .method("user.detail.get", (c) => c.json("detail"));
 
@@ -583,7 +643,10 @@ describe("core/app (Fractal class)", () => {
     test('.use("*.*", middleware) matches two-segment methods but not single or three-segment', async () => {
       const spy = vi.fn();
       const app = new Fractal()
-        .use("*.*", async (_c, next) => { spy(); await next(); })
+        .use("*.*", async (_c, next) => {
+          spy();
+          await next();
+        })
         .method("ping", (c) => c.json("pong"))
         .method("user.get", (c) => c.json("user"))
         .method("item.delete", (c) => c.json("deleted"))
@@ -605,7 +668,10 @@ describe("core/app (Fractal class)", () => {
     test('.use("**.*", middleware) matches multi-segment methods but not single-segment', async () => {
       const spy = vi.fn();
       const app = new Fractal()
-        .use("**.*", async (_c, next) => { spy(); await next(); })
+        .use("**.*", async (_c, next) => {
+          spy();
+          await next();
+        })
         .method("ping", (c) => c.json("pong"))
         .method("user.get", (c) => c.json("user"))
         .method("admin.user.delete", (c) => c.json("deep-deleted"));
@@ -623,7 +689,10 @@ describe("core/app (Fractal class)", () => {
     test('.use("*.*.*", middleware) matches exactly 3-segment methods', async () => {
       const spy = vi.fn();
       const app = new Fractal()
-        .use("*.*.*", async (_c, next) => { spy(); await next(); })
+        .use("*.*.*", async (_c, next) => {
+          spy();
+          await next();
+        })
         .method("x.y.z", (c) => c.json("three"))
         .method("p.q", (c) => c.json("two"))
         .method("w.x.y.z", (c) => c.json("four"));
@@ -641,7 +710,10 @@ describe("core/app (Fractal class)", () => {
     test('.use("**.*.get", middleware) matches multi-segment methods ending in .get with at least 2 segments before', async () => {
       const spy = vi.fn();
       const app = new Fractal()
-        .use("**.*.get", async (_c, next) => { spy(); await next(); })
+        .use("**.*.get", async (_c, next) => {
+          spy();
+          await next();
+        })
         .method("a.b.get", (c) => c.json("ok"))
         .method("a.b.c.get", (c) => c.json("ok"));
 
@@ -655,7 +727,10 @@ describe("core/app (Fractal class)", () => {
     test("scoped middleware runs only for matching methods", async () => {
       const spy = vi.fn();
       const app = new Fractal()
-        .use("admin.*", async (_c, next) => { spy(); await next(); })
+        .use("admin.*", async (_c, next) => {
+          spy();
+          await next();
+        })
         .method("admin.delete", (c) => c.json("deleted"))
         .method("user.get", (c) => c.json("user"));
 
@@ -697,9 +772,18 @@ describe("core/app (Fractal class)", () => {
     test("multiple middleware execute in registration order", async () => {
       const order: number[] = [];
       const app = new Fractal()
-        .use(async (_c, next) => { order.push(1); await next(); })
-        .use(async (_c, next) => { order.push(2); await next(); })
-        .use(async (_c, next) => { order.push(3); await next(); })
+        .use(async (_c, next) => {
+          order.push(1);
+          await next();
+        })
+        .use(async (_c, next) => {
+          order.push(2);
+          await next();
+        })
+        .use(async (_c, next) => {
+          order.push(3);
+          await next();
+        })
         .method("ping", (c) => c.json("pong"));
 
       await app.dispatch(makeRequest("ping", {}, 1));
@@ -752,47 +836,83 @@ describe("core/app (Fractal class)", () => {
   describe(".use() pattern validation", () => {
     test("rejects empty pattern", () => {
       const app = new Fractal();
-      expect(() => app.use("", async (_c, next) => { await next(); })).toThrow();
+      expect(() =>
+        app.use("", async (_c, next) => {
+          await next();
+        }),
+      ).toThrow();
     });
 
     test("rejects leading dot in pattern", () => {
       const app = new Fractal();
-      expect(() => app.use(".admin", async (_c, next) => { await next(); })).toThrow();
+      expect(() =>
+        app.use(".admin", async (_c, next) => {
+          await next();
+        }),
+      ).toThrow();
     });
 
     test("rejects trailing dot in pattern", () => {
       const app = new Fractal();
-      expect(() => app.use("admin.", async (_c, next) => { await next(); })).toThrow();
+      expect(() =>
+        app.use("admin.", async (_c, next) => {
+          await next();
+        }),
+      ).toThrow();
     });
 
     test("rejects consecutive dots in pattern", () => {
       const app = new Fractal();
-      expect(() => app.use("admin..get", async (_c, next) => { await next(); })).toThrow();
+      expect(() =>
+        app.use("admin..get", async (_c, next) => {
+          await next();
+        }),
+      ).toThrow();
     });
 
     test("rejects rpc. prefix in pattern", () => {
       const app = new Fractal();
-      expect(() => app.use("rpc.discover", async (_c, next) => { await next(); })).toThrow();
+      expect(() =>
+        app.use("rpc.discover", async (_c, next) => {
+          await next();
+        }),
+      ).toThrow();
     });
 
     test("rejects reserved name '$notify' in pattern", () => {
       const app = new Fractal();
-      expect(() => app.use("$notify", async (_c, next) => { await next(); })).toThrow();
+      expect(() =>
+        app.use("$notify", async (_c, next) => {
+          await next();
+        }),
+      ).toThrow();
     });
 
     test("rejects reserved name 'dispose' in pattern", () => {
       const app = new Fractal();
-      expect(() => app.use("dispose", async (_c, next) => { await next(); })).toThrow();
+      expect(() =>
+        app.use("dispose", async (_c, next) => {
+          await next();
+        }),
+      ).toThrow();
     });
 
     test("rejects reserved name 'then' in pattern", () => {
       const app = new Fractal();
-      expect(() => app.use("then", async (_c, next) => { await next(); })).toThrow();
+      expect(() =>
+        app.use("then", async (_c, next) => {
+          await next();
+        }),
+      ).toThrow();
     });
 
     test("rejects 'then.check' pattern (reserved first segment)", () => {
       const app = new Fractal();
-      expect(() => app.use("then.check", async (_c, next) => { await next(); })).toThrow();
+      expect(() =>
+        app.use("then.check", async (_c, next) => {
+          await next();
+        }),
+      ).toThrow();
     });
   });
 
@@ -843,32 +963,42 @@ describe("core/app (Fractal class)", () => {
     test('"admin.delete" vs "admin.deleteUser" should NOT conflict', () => {
       const app = new Fractal();
       app.method("admin.delete", (c) => c.json("ok"));
-      expect(() => app.method("admin.deleteUser", (c) => c.json("ok"))).not.toThrow();
+      expect(() =>
+        app.method("admin.deleteUser", (c) => c.json("ok")),
+      ).not.toThrow();
     });
 
     test('"a.b.c" vs "a.b.c.d" SHOULD conflict (deep namespace)', () => {
       const app = new Fractal();
       app.method("a.b.c", (c) => c.json("ok"));
-      expect(() => app.method("a.b.c.d", (c) => c.json("ok"))).toThrow(/conflicts/);
+      expect(() => app.method("a.b.c.d", (c) => c.json("ok"))).toThrow(
+        /conflicts/,
+      );
     });
 
     test('"a.b.c.d" registered first, then "a.b.c" SHOULD conflict (reverse direction)', () => {
       const app = new Fractal();
       app.method("a.b.c.d", (c) => c.json("ok"));
-      expect(() => app.method("a.b.c", (c) => c.json("ok"))).toThrow(/conflicts/);
+      expect(() => app.method("a.b.c", (c) => c.json("ok"))).toThrow(
+        /conflicts/,
+      );
     });
 
     test('"user.profile.get", "user.profile.set", and "user.account.get" should all coexist', () => {
       const app = new Fractal();
       app.method("user.profile.get", (c) => c.json("ok"));
       app.method("user.profile.set", (c) => c.json("ok"));
-      expect(() => app.method("user.account.get", (c) => c.json("ok"))).not.toThrow();
+      expect(() =>
+        app.method("user.account.get", (c) => c.json("ok")),
+      ).not.toThrow();
     });
 
     test('"admin.get" vs "admin.getUser" should NOT conflict (non-dot-boundary partial match in namespace)', () => {
       const app = new Fractal();
       app.method("admin.get", (c) => c.json("ok"));
-      expect(() => app.method("admin.getUser", (c) => c.json("ok"))).not.toThrow();
+      expect(() =>
+        app.method("admin.getUser", (c) => c.json("ok")),
+      ).not.toThrow();
     });
   });
 
@@ -921,7 +1051,13 @@ describe("core/app (Fractal class)", () => {
         });
 
       const response = await app.dispatch(makeRequest("ping", {}, 1));
-      expect(order).toEqual(["outer-before", "inner-before", "handler", "inner-after", "outer-after"]);
+      expect(order).toEqual([
+        "outer-before",
+        "inner-before",
+        "handler",
+        "inner-after",
+        "outer-after",
+      ]);
       // Outer middleware runs last in the after-phase, so its replacement wins
       expect(response).toMatchObject({ result: "outer", id: 1 });
     });
@@ -1063,7 +1199,9 @@ describe("core/app (Fractal class)", () => {
 
   describe("handler returning invalid values", () => {
     test("handler returns object missing jsonrpc field → -32603", async () => {
-      const app = new Fractal().method("bad", (() => ({ result: "ok" })) as any);
+      const app = new Fractal().method("bad", (() => ({
+        result: "ok",
+      })) as any);
       const response = await app.dispatch(makeRequest("bad", {}, 1));
       expect(response).toMatchObject({
         jsonrpc: "2.0",
@@ -1109,7 +1247,9 @@ describe("core/app (Fractal class)", () => {
     });
 
     test("handler returns object with result but missing jsonrpc preserves error id", async () => {
-      const app = new Fractal().method("bad", (() => ({ result: "ok" })) as any);
+      const app = new Fractal().method("bad", (() => ({
+        result: "ok",
+      })) as any);
       const response = await app.dispatch(makeRequest("bad", {}, 42));
       expect(response).toMatchObject({
         error: { code: -32603 },
@@ -1118,8 +1258,12 @@ describe("core/app (Fractal class)", () => {
     });
 
     test("handler returns invalid value as notification → void", async () => {
-      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-      const app = new Fractal().method("bad", (() => ({ result: "ok" })) as any);
+      const consoleSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
+      const app = new Fractal().method("bad", (() => ({
+        result: "ok",
+      })) as any);
       const result = await app.dispatch(makeNotification("bad"));
       expect(result).toBeUndefined();
       consoleSpy.mockRestore();
@@ -1232,12 +1376,11 @@ describe("core/app (Fractal class)", () => {
 
     test("concurrent dispatches do not share context state", async () => {
       const contexts: any[] = [];
-      const app = new Fractal()
-        .method("capture", async (c) => {
-          contexts.push(c);
-          await new Promise((resolve) => setTimeout(resolve, 10));
-          return c.json(c.req.params.value);
-        });
+      const app = new Fractal().method("capture", async (c) => {
+        contexts.push(c);
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        return c.json(c.req.params.value);
+      });
 
       await Promise.all([
         app.dispatch(makeRequest("capture", { value: "a" }, 1)),
@@ -1308,12 +1451,11 @@ describe("core/app (Fractal class)", () => {
     });
 
     test("many concurrent dispatches (10+) all resolve independently", async () => {
-      const app = new Fractal()
-        .method("echo", async (c) => {
-          const delay = Math.random() * 10;
-          await new Promise((resolve) => setTimeout(resolve, delay));
-          return c.json(c.req.params.n);
-        });
+      const app = new Fractal().method("echo", async (c) => {
+        const delay = Math.random() * 10;
+        await new Promise((resolve) => setTimeout(resolve, delay));
+        return c.json(c.req.params.n);
+      });
 
       const promises = Array.from({ length: 15 }, (_, i) =>
         app.dispatch(makeRequest("echo", { n: i }, i + 1)),
@@ -1496,7 +1638,9 @@ describe("core/app (Fractal class)", () => {
     });
 
     test("notification with handler returning void → void (no response)", async () => {
-      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
       const app = new Fractal().method("bad", ((_c: any) => {
         return undefined;
       }) as any);
@@ -1512,31 +1656,59 @@ describe("core/app (Fractal class)", () => {
     test("mix of global and scoped middleware: verify they execute in registration order", async () => {
       const order: string[] = [];
       const app = new Fractal()
-        .use(async (_c, next) => { order.push("global-1"); await next(); })
-        .use("admin.*", async (_c, next) => { order.push("scoped-admin"); await next(); })
-        .use(async (_c, next) => { order.push("global-2"); await next(); })
+        .use(async (_c, next) => {
+          order.push("global-1");
+          await next();
+        })
+        .use("admin.*", async (_c, next) => {
+          order.push("scoped-admin");
+          await next();
+        })
+        .use(async (_c, next) => {
+          order.push("global-2");
+          await next();
+        })
         .method("admin.delete", (c) => {
           order.push("handler");
           return c.json("deleted");
         });
 
       await app.dispatch(makeRequest("admin.delete", {}, 1));
-      expect(order).toEqual(["global-1", "scoped-admin", "global-2", "handler"]);
+      expect(order).toEqual([
+        "global-1",
+        "scoped-admin",
+        "global-2",
+        "handler",
+      ]);
     });
 
     test("multiple scoped middleware matching same method: verify registration order", async () => {
       const order: string[] = [];
       const app = new Fractal()
-        .use("admin.**", async (_c, next) => { order.push("admin-globstar"); await next(); })
-        .use("admin.*", async (_c, next) => { order.push("admin-star"); await next(); })
-        .use("**", async (_c, next) => { order.push("double-star"); await next(); })
+        .use("admin.**", async (_c, next) => {
+          order.push("admin-globstar");
+          await next();
+        })
+        .use("admin.*", async (_c, next) => {
+          order.push("admin-star");
+          await next();
+        })
+        .use("**", async (_c, next) => {
+          order.push("double-star");
+          await next();
+        })
         .method("admin.delete", (c) => {
           order.push("handler");
           return c.json("deleted");
         });
 
       await app.dispatch(makeRequest("admin.delete", {}, 1));
-      expect(order).toEqual(["admin-globstar", "admin-star", "double-star", "handler"]);
+      expect(order).toEqual([
+        "admin-globstar",
+        "admin-star",
+        "double-star",
+        "handler",
+      ]);
     });
   });
 
@@ -1578,12 +1750,10 @@ describe("core/app (Fractal class)", () => {
       };
 
       // Use separate apps to avoid namespace conflict between "admin" and "admin.delete"
-      const app1 = new Fractal()
-        .use("admin.**", mw)
-        .method("admin", (c) => {
-          order.push("handler-admin");
-          return c.json("admin");
-        });
+      const app1 = new Fractal().use("admin.**", mw).method("admin", (c) => {
+        order.push("handler-admin");
+        return c.json("admin");
+      });
 
       const app2 = new Fractal()
         .use("admin.**", mw)
@@ -1688,12 +1858,20 @@ describe("core/app (Fractal class)", () => {
   describe("reserved name patterns in use() (dotted forms)", () => {
     test("rejects '$notify.something' pattern", () => {
       const app = new Fractal();
-      expect(() => app.use("$notify.events", async (_c, next) => { await next(); })).toThrow();
+      expect(() =>
+        app.use("$notify.events", async (_c, next) => {
+          await next();
+        }),
+      ).toThrow();
     });
 
     test("rejects 'dispose.cleanup' pattern", () => {
       const app = new Fractal();
-      expect(() => app.use("dispose.cleanup", async (_c, next) => { await next(); })).toThrow();
+      expect(() =>
+        app.use("dispose.cleanup", async (_c, next) => {
+          await next();
+        }),
+      ).toThrow();
     });
   });
 
@@ -1767,8 +1945,14 @@ describe("core/app (Fractal class)", () => {
     test("chained .use() calls share the internal middleware registry", async () => {
       const order: string[] = [];
       const app = new Fractal()
-        .use(async (_c, next) => { order.push("mw1"); await next(); })
-        .use(async (_c, next) => { order.push("mw2"); await next(); })
+        .use(async (_c, next) => {
+          order.push("mw1");
+          await next();
+        })
+        .use(async (_c, next) => {
+          order.push("mw2");
+          await next();
+        })
         .method("ping", (c) => {
           order.push("handler");
           return c.json("pong");
@@ -1783,7 +1967,10 @@ describe("core/app (Fractal class)", () => {
     test("intermediate .use() instance shares registry with final instance", async () => {
       const spy = vi.fn();
       const base = new Fractal();
-      const withMw = base.use(async (_c, next) => { spy(); await next(); });
+      const withMw = base.use(async (_c, next) => {
+        spy();
+        await next();
+      });
       const final = withMw.method("ping", (c) => c.json("pong"));
 
       await final.dispatch(makeRequest("ping", {}, 1));
@@ -1839,12 +2026,17 @@ describe("core/app (Fractal class)", () => {
     test('"admin.**" matches admin.user.role.assign (4 segments)', async () => {
       const spy = vi.fn();
       const app = new Fractal()
-        .use("admin.**", async (_c, next) => { spy(); await next(); })
+        .use("admin.**", async (_c, next) => {
+          spy();
+          await next();
+        })
         .method("admin.user.role.assign", (c) => c.json("assigned"));
 
       await app.dispatch(makeRequest("admin.user.role.assign", {}, 1));
       expect(spy).toHaveBeenCalledTimes(1);
-      const response = await app.dispatch(makeRequest("admin.user.role.assign", {}, 2));
+      const response = await app.dispatch(
+        makeRequest("admin.user.role.assign", {}, 2),
+      );
       expect(response).toMatchObject({ result: "assigned" });
     });
   });
@@ -1861,7 +2053,9 @@ describe("core/app (Fractal class)", () => {
         })
         .method("log", (c) => c.json("logged"));
 
-      const result = await app.dispatch(makeNotification("log", { msg: "hello" }));
+      const result = await app.dispatch(
+        makeNotification("log", { msg: "hello" }),
+      );
       expect(result).toBeUndefined(); // notification returns void
       // But c.res should have been set by the handler
       expect(capturedRes).toBeDefined();
@@ -1905,7 +2099,10 @@ describe("core/app (Fractal class)", () => {
     test('"admin*" is a LITERAL pattern — only matches method name "admin*"', async () => {
       const spy = vi.fn();
       const app = new Fractal()
-        .use("admin*", async (_c, next) => { spy(); await next(); })
+        .use("admin*", async (_c, next) => {
+          spy();
+          await next();
+        })
         .method("admin*", (c) => c.json("literal"))
         .method("admin", (c) => c.json("admin"))
         .method("adminFoo", (c) => c.json("adminFoo"));
@@ -1929,7 +2126,10 @@ describe("core/app (Fractal class)", () => {
     test('"*" IS a wildcard — matches any single-segment method', async () => {
       const spy = vi.fn();
       const app = new Fractal()
-        .use("*", async (_c, next) => { spy(); await next(); })
+        .use("*", async (_c, next) => {
+          spy();
+          await next();
+        })
         .method("ping", (c) => c.json("pong"))
         .method("hello", (c) => c.json("world"))
         .method("user.get", (c) => c.json("user"));
@@ -1953,7 +2153,10 @@ describe("core/app (Fractal class)", () => {
     test('"foo*bar" is a LITERAL pattern — only matches method name "foo*bar"', async () => {
       const spy = vi.fn();
       const app = new Fractal()
-        .use("foo*bar", async (_c, next) => { spy(); await next(); })
+        .use("foo*bar", async (_c, next) => {
+          spy();
+          await next();
+        })
         .method("foo*bar", (c) => c.json("literal"))
         .method("foobar", (c) => c.json("foobar"))
         .method("fooXbar", (c) => c.json("fooXbar"));
@@ -2079,11 +2282,17 @@ describe("core/app (Fractal class)", () => {
       const spy2 = vi.fn();
 
       const app1 = new Fractal()
-        .use(async (_c, next) => { spy1(); await next(); })
+        .use(async (_c, next) => {
+          spy1();
+          await next();
+        })
         .method("ping", (c) => c.json("pong1"));
 
       const app2 = new Fractal()
-        .use(async (_c, next) => { spy2(); await next(); })
+        .use(async (_c, next) => {
+          spy2();
+          await next();
+        })
         .method("ping", (c) => c.json("pong2"));
 
       await app1.dispatch(makeRequest("ping", {}, 1));
@@ -2105,7 +2314,9 @@ describe("core/app (Fractal class)", () => {
       app1.method("shared-name", (c) => c.json("from-app1"));
 
       // app2 should be able to register the same method name without conflict
-      expect(() => app2.method("shared-name", (c) => c.json("from-app2"))).not.toThrow();
+      expect(() =>
+        app2.method("shared-name", (c) => c.json("from-app2")),
+      ).not.toThrow();
     });
   });
 
@@ -2165,7 +2376,10 @@ describe("core/app (Fractal class)", () => {
       const mwSpy = vi.fn();
       const app = new Fractal()
         .method("*", (c) => c.json("star-handler"))
-        .use("*", async (_c, next) => { mwSpy(); await next(); });
+        .use("*", async (_c, next) => {
+          mwSpy();
+          await next();
+        });
 
       // Dispatching "*" should match the "*" method and the "*" wildcard middleware
       const response = await app.dispatch(makeRequest("*", {}, 1));
@@ -2179,7 +2393,10 @@ describe("core/app (Fractal class)", () => {
       const app = new Fractal()
         .method("*", (c) => c.json("star-handler"))
         .method("ping", (c) => c.json("pong"))
-        .use("*", async (_c, next) => { mwSpy(); await next(); });
+        .use("*", async (_c, next) => {
+          mwSpy();
+          await next();
+        });
 
       // Dispatch "ping" — mw should run because "*" pattern matches single-segment "ping"
       mwSpy.mockClear();
@@ -2197,7 +2414,10 @@ describe("core/app (Fractal class)", () => {
       const app = new Fractal()
         .method("*", (c) => c.json("star-handler"))
         .method("user.get", (c) => c.json("user"))
-        .use("*", async (_c, next) => { mwSpy(); await next(); });
+        .use("*", async (_c, next) => {
+          mwSpy();
+          await next();
+        });
 
       // Dispatch "user.get" — mw should NOT run because "*" only matches single segments
       mwSpy.mockClear();
@@ -2221,12 +2441,17 @@ describe("core/app (Fractal class)", () => {
           return c.json(c.req.params);
         });
 
-      const response = await app.dispatch(makeRequest("echo", { original: "value" }, 1));
+      const response = await app.dispatch(
+        makeRequest("echo", { original: "value" }, 1),
+      );
       expect(response).toMatchObject({
         result: { original: "value", injected: "by-middleware" },
         id: 1,
       });
-      expect(handlerParams).toEqual({ original: "value", injected: "by-middleware" });
+      expect(handlerParams).toEqual({
+        original: "value",
+        injected: "by-middleware",
+      });
     });
 
     test("middleware overwrites an existing property in c.req.params and handler sees the new value", async () => {
@@ -2241,7 +2466,9 @@ describe("core/app (Fractal class)", () => {
           return c.json(c.req.params);
         });
 
-      const response = await app.dispatch(makeRequest("echo", { name: "original" }, 1));
+      const response = await app.dispatch(
+        makeRequest("echo", { name: "original" }, 1),
+      );
       expect(response).toMatchObject({
         result: { name: "overwritten" },
         id: 1,
@@ -2279,47 +2506,83 @@ describe("core/app (Fractal class)", () => {
   describe("use() reserved name patterns: wildcard forms ($notify.*, dispose.*, then.*)", () => {
     test("rejects '$notify.*' pattern (reserved first segment with wildcard)", () => {
       const app = new Fractal();
-      expect(() => app.use("$notify.*", async (_c, next) => { await next(); })).toThrow();
+      expect(() =>
+        app.use("$notify.*", async (_c, next) => {
+          await next();
+        }),
+      ).toThrow();
     });
 
     test("rejects 'dispose.*' pattern (reserved first segment with wildcard)", () => {
       const app = new Fractal();
-      expect(() => app.use("dispose.*", async (_c, next) => { await next(); })).toThrow();
+      expect(() =>
+        app.use("dispose.*", async (_c, next) => {
+          await next();
+        }),
+      ).toThrow();
     });
 
     test("rejects 'then.*' pattern (reserved first segment with wildcard)", () => {
       const app = new Fractal();
-      expect(() => app.use("then.*", async (_c, next) => { await next(); })).toThrow();
+      expect(() =>
+        app.use("then.*", async (_c, next) => {
+          await next();
+        }),
+      ).toThrow();
     });
 
     test("rejects '$notify.**' pattern (reserved first segment with globstar)", () => {
       const app = new Fractal();
-      expect(() => app.use("$notify.**", async (_c, next) => { await next(); })).toThrow();
+      expect(() =>
+        app.use("$notify.**", async (_c, next) => {
+          await next();
+        }),
+      ).toThrow();
     });
 
     test("rejects 'dispose.**' pattern (reserved first segment with globstar)", () => {
       const app = new Fractal();
-      expect(() => app.use("dispose.**", async (_c, next) => { await next(); })).toThrow();
+      expect(() =>
+        app.use("dispose.**", async (_c, next) => {
+          await next();
+        }),
+      ).toThrow();
     });
 
     test("rejects 'then.**' pattern (reserved first segment with globstar)", () => {
       const app = new Fractal();
-      expect(() => app.use("then.**", async (_c, next) => { await next(); })).toThrow();
+      expect(() =>
+        app.use("then.**", async (_c, next) => {
+          await next();
+        }),
+      ).toThrow();
     });
 
     test("rejects '$notify.foo.bar' pattern (reserved first segment, deep path)", () => {
       const app = new Fractal();
-      expect(() => app.use("$notify.foo.bar", async (_c, next) => { await next(); })).toThrow();
+      expect(() =>
+        app.use("$notify.foo.bar", async (_c, next) => {
+          await next();
+        }),
+      ).toThrow();
     });
 
     test("rejects 'dispose.foo.bar' pattern (reserved first segment, deep path)", () => {
       const app = new Fractal();
-      expect(() => app.use("dispose.foo.bar", async (_c, next) => { await next(); })).toThrow();
+      expect(() =>
+        app.use("dispose.foo.bar", async (_c, next) => {
+          await next();
+        }),
+      ).toThrow();
     });
 
     test("rejects 'then.foo.bar' pattern (reserved first segment, deep path)", () => {
       const app = new Fractal();
-      expect(() => app.use("then.foo.bar", async (_c, next) => { await next(); })).toThrow();
+      expect(() =>
+        app.use("then.foo.bar", async (_c, next) => {
+          await next();
+        }),
+      ).toThrow();
     });
   });
 
@@ -2333,7 +2596,11 @@ describe("core/app (Fractal class)", () => {
         return c.json("pong");
       });
 
-      const fakeEvent = { data: { custom: true }, type: "message", origin: "https://example.com" } as MessageEvent;
+      const fakeEvent = {
+        data: { custom: true },
+        type: "message",
+        origin: "https://example.com",
+      } as MessageEvent;
       await app.dispatch(makeRequest("ping", {}, 1), fakeEvent);
       expect(capturedRaw).toBe(fakeEvent);
     });
@@ -2362,7 +2629,9 @@ describe("core/app (Fractal class)", () => {
 
   describe("notification with invalid params: array", () => {
     test("notification with params: [] returns void and logs to console.error", async () => {
-      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
       const app = new Fractal().method("ping", (c) => c.json("pong"));
       const result = await app.dispatch({
         jsonrpc: "2.0",
@@ -2379,7 +2648,9 @@ describe("core/app (Fractal class)", () => {
 
     test("notification with params: [] does not execute handler", async () => {
       const handlerSpy = vi.fn((c: any) => c.json("pong"));
-      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
       const app = new Fractal().method("ping", handlerSpy);
       await app.dispatch({
         jsonrpc: "2.0",
@@ -2391,7 +2662,9 @@ describe("core/app (Fractal class)", () => {
     });
 
     test("request with params: [] (non-notification) returns -32600 Invalid Request", async () => {
-      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
       const app = new Fractal().method("ping", (c) => c.json("pong"));
       const response = await app.dispatch({
         jsonrpc: "2.0",
@@ -2424,7 +2697,10 @@ describe("core/app (Fractal class)", () => {
       // The middleware captured c.res after next(); id should be null for notification
       expect(capturedRes).toBeDefined();
       expect(capturedRes.id).toBeNull();
-      expect(capturedRes.error).toMatchObject({ code: -32000, message: "Custom error" });
+      expect(capturedRes.error).toMatchObject({
+        code: -32000,
+        message: "Custom error",
+      });
     });
   });
 
@@ -2518,7 +2794,9 @@ describe("core/app (Fractal class)", () => {
 
   describe("notification console.error content verification", () => {
     test("when a notification handler throws, console.error receives the actual Error object", async () => {
-      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
       const thrownError = new Error("notification failure details");
       const app = new Fractal().method("boom", () => {
         throw thrownError;
@@ -2531,7 +2809,9 @@ describe("core/app (Fractal class)", () => {
     });
 
     test("when a notification middleware throws, console.error receives the actual Error object", async () => {
-      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
       const thrownError = new Error("middleware notification error");
       const app = new Fractal()
         .use(async (_c, _next) => {
@@ -2565,7 +2845,9 @@ describe("core/app (Fractal class)", () => {
           await next();
           capturedRes = c.res;
         })
-        .method("fail", (c) => c.error(-32000, "Notification error", { info: "test" }));
+        .method("fail", (c) =>
+          c.error(-32000, "Notification error", { info: "test" }),
+        );
 
       const result = await app.dispatch(makeNotification("fail"));
       expect(result).toBeUndefined();
@@ -2757,7 +3039,10 @@ describe("core/app (Fractal class)", () => {
     test('.use("admin.delete", middleware) matches exactly "admin.delete"', async () => {
       const spy = vi.fn();
       const app = new Fractal()
-        .use("admin.delete", async (_c, next) => { spy(); await next(); })
+        .use("admin.delete", async (_c, next) => {
+          spy();
+          await next();
+        })
         .method("admin.delete", (c) => c.json("deleted"));
 
       await app.dispatch(makeRequest("admin.delete", {}, 1));
@@ -2767,7 +3052,10 @@ describe("core/app (Fractal class)", () => {
     test('.use("admin.delete", middleware) does NOT match "admin.delete.force"', async () => {
       const spy = vi.fn();
       const app = new Fractal()
-        .use("admin.delete", async (_c, next) => { spy(); await next(); })
+        .use("admin.delete", async (_c, next) => {
+          spy();
+          await next();
+        })
         .method("admin.delete.force", (c) => c.json("force-deleted"));
 
       await app.dispatch(makeRequest("admin.delete.force", {}, 1));
@@ -2777,7 +3065,10 @@ describe("core/app (Fractal class)", () => {
     test('.use("admin.delete", middleware) does NOT match "admin"', async () => {
       const spy = vi.fn();
       const app = new Fractal()
-        .use("admin.delete", async (_c, next) => { spy(); await next(); })
+        .use("admin.delete", async (_c, next) => {
+          spy();
+          await next();
+        })
         .method("admin", (c) => c.json("admin"));
 
       await app.dispatch(makeRequest("admin", {}, 1));
@@ -2789,7 +3080,9 @@ describe("core/app (Fractal class)", () => {
 
   describe("calling an intermediate namespace directly", () => {
     test('dispatch({method: "user"}) returns a result when "user" is registered as a handler', async () => {
-      const app = new Fractal().method("user", (c) => c.json({ id: c.req.params.id }));
+      const app = new Fractal().method("user", (c) =>
+        c.json({ id: c.req.params.id }),
+      );
       const response = await app.dispatch(makeRequest("user", { id: "1" }, 1));
       expect(response).toMatchObject({
         jsonrpc: "2.0",
@@ -2814,7 +3107,10 @@ describe("core/app (Fractal class)", () => {
     test('"*.**.get" matches "x.y.get" (single * then ** then literal)', async () => {
       const spy = vi.fn();
       const app = new Fractal()
-        .use("*.**.get", async (_c, next) => { spy(); await next(); })
+        .use("*.**.get", async (_c, next) => {
+          spy();
+          await next();
+        })
         .method("x.y.get", (c) => c.json("ok"));
 
       await app.dispatch(makeRequest("x.y.get", {}, 1));
@@ -2824,7 +3120,10 @@ describe("core/app (Fractal class)", () => {
     test('"*.**.get" matches "a.b.c.get" (single * then ** consuming multiple then literal)', async () => {
       const spy = vi.fn();
       const app = new Fractal()
-        .use("*.**.get", async (_c, next) => { spy(); await next(); })
+        .use("*.**.get", async (_c, next) => {
+          spy();
+          await next();
+        })
         .method("a.b.c.get", (c) => c.json("ok"));
 
       await app.dispatch(makeRequest("a.b.c.get", {}, 1));
@@ -2834,7 +3133,10 @@ describe("core/app (Fractal class)", () => {
     test('"*.**.get" does NOT match "x.get" (* needs 1 seg + ** needs 1+ seg + "get" = 3 minimum)', async () => {
       const spy = vi.fn();
       const app = new Fractal()
-        .use("*.**.get", async (_c, next) => { spy(); await next(); })
+        .use("*.**.get", async (_c, next) => {
+          spy();
+          await next();
+        })
         .method("x.get", (c) => c.json("ok"));
 
       await app.dispatch(makeRequest("x.get", {}, 1));
@@ -2845,7 +3147,10 @@ describe("core/app (Fractal class)", () => {
     test('"*.**.get" does NOT match "get" (single-segment)', async () => {
       const spy = vi.fn();
       const app = new Fractal()
-        .use("*.**.get", async (_c, next) => { spy(); await next(); })
+        .use("*.**.get", async (_c, next) => {
+          spy();
+          await next();
+        })
         .method("get", (c) => c.json("ok"));
 
       await app.dispatch(makeRequest("get", {}, 1));
@@ -2855,7 +3160,10 @@ describe("core/app (Fractal class)", () => {
     test('"*.**.get" does NOT match "a.b.c.set" (wrong trailing literal)', async () => {
       const spy = vi.fn();
       const app = new Fractal()
-        .use("*.**.get", async (_c, next) => { spy(); await next(); })
+        .use("*.**.get", async (_c, next) => {
+          spy();
+          await next();
+        })
         .method("a.b.c.set", (c) => c.json("ok"));
 
       await app.dispatch(makeRequest("a.b.c.set", {}, 1));
@@ -2944,35 +3252,46 @@ describe("core/app (Fractal class)", () => {
     test('.use("*", mw) does not throw even though * would match reserved name methods', () => {
       const app = new Fractal();
       expect(() =>
-        app.use("*", async (_c, next) => { await next(); })
+        app.use("*", async (_c, next) => {
+          await next();
+        }),
       ).not.toThrow();
     });
 
     test('.use("**", mw) does not throw even though ** would match reserved name methods', () => {
       const app = new Fractal();
       expect(() =>
-        app.use("**", async (_c, next) => { await next(); })
+        app.use("**", async (_c, next) => {
+          await next();
+        }),
       ).not.toThrow();
     });
 
     test('.use("*.check", mw) does not throw — * as first segment bypasses reserved name check', () => {
       const app = new Fractal();
       expect(() =>
-        app.use("*.check", async (_c, next) => { await next(); })
+        app.use("*.check", async (_c, next) => {
+          await next();
+        }),
       ).not.toThrow();
     });
 
     test('.use("**.check", mw) does not throw — ** as first segment bypasses reserved name check', () => {
       const app = new Fractal();
       expect(() =>
-        app.use("**.check", async (_c, next) => { await next(); })
+        app.use("**.check", async (_c, next) => {
+          await next();
+        }),
       ).not.toThrow();
     });
 
     test('.use("*", mw) middleware actually runs for single-segment methods', async () => {
       const spy = vi.fn();
       const app = new Fractal()
-        .use("*", async (_c, next) => { spy(); await next(); })
+        .use("*", async (_c, next) => {
+          spy();
+          await next();
+        })
         .method("ping", (c) => c.json("pong"));
 
       await app.dispatch(makeRequest("ping", {}, 1));
@@ -2982,7 +3301,10 @@ describe("core/app (Fractal class)", () => {
     test('.use("**", mw) middleware actually runs for all methods', async () => {
       const spy = vi.fn();
       const app = new Fractal()
-        .use("**", async (_c, next) => { spy(); await next(); })
+        .use("**", async (_c, next) => {
+          spy();
+          await next();
+        })
         .method("ping", (c) => c.json("pong"))
         .method("user.get", (c) => c.json("user"));
 
@@ -3126,9 +3448,7 @@ describe("core/app (Fractal class)", () => {
 
   describe("c.error() with 2 arguments (no data)", () => {
     test('c.error(-32000, "msg") with exactly 2 arguments → "data" key absent from error object', async () => {
-      const app = new Fractal().method("fail", (c) =>
-        c.error(-32000, "msg"),
-      );
+      const app = new Fractal().method("fail", (c) => c.error(-32000, "msg"));
       const response = await app.dispatch(makeRequest("fail", {}, 1));
       expect(response).toMatchObject({
         error: { code: -32000, message: "msg" },
@@ -3189,7 +3509,7 @@ describe("core/app (Fractal class)", () => {
 
   // ─── dispatch with method "rpc.discover" returns -32601 ───
 
-  describe('dispatch with reserved rpc. method name from external client', () => {
+  describe("dispatch with reserved rpc. method name from external client", () => {
     test('dispatch with method "rpc.discover" returns -32601 Method not found', async () => {
       // "rpc.discover" cannot be registered (rpc. prefix is reserved),
       // so dispatching it from an external client should yield Method not found.
@@ -3204,7 +3524,9 @@ describe("core/app (Fractal class)", () => {
 
     test('dispatch with method "rpc.listMethods" returns -32601 Method not found', async () => {
       const app = new Fractal().method("ping", (c) => c.json("pong"));
-      const response = await app.dispatch(makeRequest("rpc.listMethods", {}, 2));
+      const response = await app.dispatch(
+        makeRequest("rpc.listMethods", {}, 2),
+      );
       expect(response).toMatchObject({
         error: { code: -32601, message: "Method not found" },
         id: 2,
@@ -3220,47 +3542,59 @@ describe("core/app (Fractal class)", () => {
 
   // ─── .use() pattern validation error message verification ───
 
-  describe('.use() pattern validation exact error messages', () => {
+  describe(".use() pattern validation exact error messages", () => {
     test('empty pattern throws "Invalid pattern: empty string"', () => {
       const app = new Fractal();
-      expect(() => app.use("", async (_c, next) => { await next(); })).toThrow(
-        "Invalid pattern: empty string",
-      );
+      expect(() =>
+        app.use("", async (_c, next) => {
+          await next();
+        }),
+      ).toThrow("Invalid pattern: empty string");
     });
 
     test('leading dot throws "Invalid pattern: leading dot in ..."', () => {
       const app = new Fractal();
-      expect(() => app.use(".admin", async (_c, next) => { await next(); })).toThrow(
-        'Invalid pattern: leading dot in ".admin"',
-      );
+      expect(() =>
+        app.use(".admin", async (_c, next) => {
+          await next();
+        }),
+      ).toThrow('Invalid pattern: leading dot in ".admin"');
     });
 
     test('rpc. prefix throws "Invalid pattern: \\"rpc.\\" prefix is reserved"', () => {
       const app = new Fractal();
-      expect(() => app.use("rpc.discover", async (_c, next) => { await next(); })).toThrow(
-        'Invalid pattern: "rpc." prefix is reserved',
-      );
+      expect(() =>
+        app.use("rpc.discover", async (_c, next) => {
+          await next();
+        }),
+      ).toThrow('Invalid pattern: "rpc." prefix is reserved');
     });
 
     test('trailing dot throws "Invalid pattern: trailing dot in ..."', () => {
       const app = new Fractal();
-      expect(() => app.use("admin.", async (_c, next) => { await next(); })).toThrow(
-        'Invalid pattern: trailing dot in "admin."',
-      );
+      expect(() =>
+        app.use("admin.", async (_c, next) => {
+          await next();
+        }),
+      ).toThrow('Invalid pattern: trailing dot in "admin."');
     });
 
     test('consecutive dots throws "Invalid pattern: consecutive dots in ..."', () => {
       const app = new Fractal();
-      expect(() => app.use("admin..get", async (_c, next) => { await next(); })).toThrow(
-        'Invalid pattern: consecutive dots in "admin..get"',
-      );
+      expect(() =>
+        app.use("admin..get", async (_c, next) => {
+          await next();
+        }),
+      ).toThrow('Invalid pattern: consecutive dots in "admin..get"');
     });
 
     test('reserved name "then" throws "Invalid pattern: \\"then\\" is a reserved name"', () => {
       const app = new Fractal();
-      expect(() => app.use("then", async (_c, next) => { await next(); })).toThrow(
-        'Invalid pattern: "then" is a reserved name',
-      );
+      expect(() =>
+        app.use("then", async (_c, next) => {
+          await next();
+        }),
+      ).toThrow('Invalid pattern: "then" is a reserved name');
     });
   });
 
@@ -3268,7 +3602,9 @@ describe("core/app (Fractal class)", () => {
 
   describe("middleware catches exception during notification, doesn't set c.res", () => {
     test("middleware catches handler exception during notification, swallows it without setting c.res — returns void", async () => {
-      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
       const app = new Fractal()
         .use(async (_c, next) => {
           try {
@@ -3317,7 +3653,9 @@ describe("core/app (Fractal class)", () => {
 
   describe("middleware returning void without calling next() during notification", () => {
     test("middleware returning void without calling next() during notification — returns void", async () => {
-      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
       const app = new Fractal()
         .use((_c, _next) => {
           // Does nothing: no next(), no return, no c.res assignment
@@ -3371,7 +3709,11 @@ describe("core/app (Fractal class)", () => {
       const response = await app.dispatch(makeRequest("fail", {}, 42));
       expect(response).toEqual({
         jsonrpc: "2.0",
-        error: { code: -32602, message: "Invalid params", data: { field: "email" } },
+        error: {
+          code: -32602,
+          message: "Invalid params",
+          data: { field: "email" },
+        },
         id: 42,
       });
     });
@@ -3380,7 +3722,7 @@ describe("core/app (Fractal class)", () => {
   // ─── dispatch({}) and dispatch({jsonrpc: "2.0"}) minimal requests ───
 
   describe("dispatch with minimal request objects", () => {
-    test('dispatch({}) returns -32601 Method not found', async () => {
+    test("dispatch({}) returns -32601 Method not found", async () => {
       const app = new Fractal().method("ping", (c) => c.json("pong"));
       const response = await app.dispatch({ id: 1 } as any);
       expect(response).toMatchObject({
@@ -3408,7 +3750,9 @@ describe("core/app (Fractal class)", () => {
 
   describe("notification with null params returns void and logs", () => {
     test("notification with params: null returns void and console.error is called", async () => {
-      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
       const app = new Fractal().method("ping", (c) => c.json("pong"));
       const result = await app.dispatch({
         jsonrpc: "2.0",
@@ -3425,7 +3769,9 @@ describe("core/app (Fractal class)", () => {
 
     test("notification with params: null does not execute handler", async () => {
       const handlerSpy = vi.fn((c: any) => c.json("pong"));
-      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
       const app = new Fractal().method("ping", handlerSpy);
       await app.dispatch({
         jsonrpc: "2.0",

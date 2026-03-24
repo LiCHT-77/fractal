@@ -1,4 +1,4 @@
-import { matchPattern, MiddlewareRegistry } from "./middleware.ts";
+import { MiddlewareRegistry, matchPattern } from "./middleware.ts";
 
 describe("core/middleware", () => {
   // ─── Pattern matching ───
@@ -224,9 +224,18 @@ describe("core/middleware", () => {
 
     test("executes middleware in registration order", async () => {
       const order: number[] = [];
-      registry.addGlobal(async (_c, next) => { order.push(1); await next(); });
-      registry.addGlobal(async (_c, next) => { order.push(2); await next(); });
-      registry.addGlobal(async (_c, next) => { order.push(3); await next(); });
+      registry.addGlobal(async (_c, next) => {
+        order.push(1);
+        await next();
+      });
+      registry.addGlobal(async (_c, next) => {
+        order.push(2);
+        await next();
+      });
+      registry.addGlobal(async (_c, next) => {
+        order.push(3);
+        await next();
+      });
 
       const handler = vi.fn((c: any) => c.json("ok"));
       await registry.execute("ping", {} as any, handler);
@@ -251,12 +260,22 @@ describe("core/middleware", () => {
         return c.json("ok");
       });
       await registry.execute("ping", {} as any, handler);
-      expect(order).toEqual(["before-1", "before-2", "handler", "after-2", "after-1"]);
+      expect(order).toEqual([
+        "before-1",
+        "before-2",
+        "handler",
+        "after-2",
+        "after-1",
+      ]);
     });
 
     test("middleware can short-circuit by returning response without next()", async () => {
       registry.addGlobal((_c, _next) => {
-        return { jsonrpc: "2.0" as const, error: { code: -32000, message: "Blocked" }, id: 1 };
+        return {
+          jsonrpc: "2.0" as const,
+          error: { code: -32000, message: "Blocked" },
+          id: 1,
+        };
       });
 
       const handler = vi.fn();
@@ -312,11 +331,15 @@ describe("core/middleware", () => {
         }
       });
 
-      const handler = vi.fn(() => { throw new Error("boom"); });
+      const handler = vi.fn(() => {
+        throw new Error("boom");
+      });
       const result = await registry.execute("ping", {} as any, handler);
       expect(caughtError).toBeInstanceOf(Error);
       // Re-thrown exception is caught by the framework's outermost catch → -32603
-      expect(result).toMatchObject({ error: { code: -32603, message: "boom" } });
+      expect(result).toMatchObject({
+        error: { code: -32603, message: "boom" },
+      });
     });
 
     test("middleware can catch exception and provide error response", async () => {
@@ -324,13 +347,21 @@ describe("core/middleware", () => {
         try {
           await next();
         } catch {
-          c.res = { jsonrpc: "2.0" as const, error: { code: -32603, message: "Caught" }, id: 1 };
+          c.res = {
+            jsonrpc: "2.0" as const,
+            error: { code: -32603, message: "Caught" },
+            id: 1,
+          };
         }
       });
 
-      const handler = vi.fn(() => { throw new Error("boom"); });
+      const handler = vi.fn(() => {
+        throw new Error("boom");
+      });
       const result = await registry.execute("ping", {} as any, handler);
-      expect(result).toMatchObject({ error: { code: -32603, message: "Caught" } });
+      expect(result).toMatchObject({
+        error: { code: -32603, message: "Caught" },
+      });
     });
 
     test("c.res is undefined before calling next()", async () => {
@@ -353,7 +384,9 @@ describe("core/middleware", () => {
 
       const handler = vi.fn((c: any) => c.json("ok"));
       // Spec says behavior is undefined, but it should not throw
-      await expect(registry.execute("ping", {} as any, handler)).resolves.toBeDefined();
+      await expect(
+        registry.execute("ping", {} as any, handler),
+      ).resolves.toBeDefined();
     });
 
     test("notification flow: middleware executes when c.req.id is undefined", async () => {
@@ -371,10 +404,22 @@ describe("core/middleware", () => {
       const notificationCtx = {
         req: { method: "ping", params: {}, id: undefined },
         res: undefined,
-        json: (data: unknown) => ({ jsonrpc: "2.0" as const, result: data, id: null }),
-        error: (code: number, message: string) => ({ jsonrpc: "2.0" as const, error: { code, message }, id: null }),
+        json: (data: unknown) => ({
+          jsonrpc: "2.0" as const,
+          result: data,
+          id: null,
+        }),
+        error: (code: number, message: string) => ({
+          jsonrpc: "2.0" as const,
+          error: { code, message },
+          id: null,
+        }),
       };
-      const result = await registry.execute("ping", notificationCtx as any, handler);
+      const result = await registry.execute(
+        "ping",
+        notificationCtx as any,
+        handler,
+      );
       expect(order).toEqual(["before", "after"]);
       expect(result).toMatchObject({ result: "pong" });
     });
@@ -390,8 +435,16 @@ describe("core/middleware", () => {
       const notificationCtx = {
         req: { method: "log.info", params: {}, id: undefined },
         res: undefined,
-        json: (data: unknown) => ({ jsonrpc: "2.0" as const, result: data, id: null }),
-        error: (code: number, message: string) => ({ jsonrpc: "2.0" as const, error: { code, message }, id: null }),
+        json: (data: unknown) => ({
+          jsonrpc: "2.0" as const,
+          result: data,
+          id: null,
+        }),
+        error: (code: number, message: string) => ({
+          jsonrpc: "2.0" as const,
+          error: { code, message },
+          id: null,
+        }),
       };
       await registry.execute("log.info", notificationCtx as any, handler);
       expect(capturedRes).toMatchObject({ result: "notification-result" });
@@ -435,7 +488,10 @@ describe("core/middleware", () => {
 
     test("scoped middleware runs only for matching methods", async () => {
       const spy = vi.fn();
-      registry.add("admin.*", async (_c, next) => { spy(); await next(); });
+      registry.add("admin.*", async (_c, next) => {
+        spy();
+        await next();
+      });
 
       const handler = vi.fn((c: any) => c.json("ok"));
 
@@ -449,9 +505,18 @@ describe("core/middleware", () => {
 
     test("global and scoped middleware execute in registration order", async () => {
       const order: string[] = [];
-      registry.addGlobal(async (_c, next) => { order.push("global-1"); await next(); });
-      registry.add("admin.*", async (_c, next) => { order.push("scoped"); await next(); });
-      registry.addGlobal(async (_c, next) => { order.push("global-2"); await next(); });
+      registry.addGlobal(async (_c, next) => {
+        order.push("global-1");
+        await next();
+      });
+      registry.add("admin.*", async (_c, next) => {
+        order.push("scoped");
+        await next();
+      });
+      registry.addGlobal(async (_c, next) => {
+        order.push("global-2");
+        await next();
+      });
 
       const handler = vi.fn((c: any) => {
         order.push("handler");
@@ -463,8 +528,14 @@ describe("core/middleware", () => {
 
     test("non-matching scoped middleware is skipped", async () => {
       const order: string[] = [];
-      registry.addGlobal(async (_c, next) => { order.push("global"); await next(); });
-      registry.add("admin.*", async (_c, next) => { order.push("admin-only"); await next(); });
+      registry.addGlobal(async (_c, next) => {
+        order.push("global");
+        await next();
+      });
+      registry.add("admin.*", async (_c, next) => {
+        order.push("admin-only");
+        await next();
+      });
 
       const handler = vi.fn((c: any) => {
         order.push("handler");
@@ -476,8 +547,14 @@ describe("core/middleware", () => {
 
     test("multiple scoped middlewares matching same method execute in registration order", async () => {
       const order: string[] = [];
-      registry.add("admin.*", async (_c, next) => { order.push("admin.*"); await next(); });
-      registry.add("*.delete", async (_c, next) => { order.push("*.delete"); await next(); });
+      registry.add("admin.*", async (_c, next) => {
+        order.push("admin.*");
+        await next();
+      });
+      registry.add("*.delete", async (_c, next) => {
+        order.push("*.delete");
+        await next();
+      });
 
       const handler = vi.fn((c: any) => {
         order.push("handler");
@@ -489,7 +566,10 @@ describe("core/middleware", () => {
 
     test("** pattern matches all methods", async () => {
       const spy = vi.fn();
-      registry.add("**", async (_c, next) => { spy(); await next(); });
+      registry.add("**", async (_c, next) => {
+        spy();
+        await next();
+      });
 
       const handler = vi.fn((c: any) => c.json("ok"));
       await registry.execute("anything.deep.nested", {} as any, handler);
@@ -533,7 +613,7 @@ describe("core/middleware", () => {
     });
 
     test("sync middleware returning void (bare return) without calling next() results in -32603", async () => {
-      registry.addGlobal(function (_c, _next) {
+      registry.addGlobal((_c, _next) => {
         // bare return — neither calls next() nor returns a JsonRpcResponse
         return;
       });
@@ -541,13 +621,17 @@ describe("core/middleware", () => {
       const handler = vi.fn((c: any) => c.json("ok"));
       const result = await registry.execute("ping", {} as any, handler);
       expect(handler).not.toHaveBeenCalled();
-      expect(result).toMatchObject({ error: { code: -32603, message: "Internal error" } });
+      expect(result).toMatchObject({
+        error: { code: -32603, message: "Internal error" },
+      });
     });
 
     test("sync middleware returning JsonRpcResponse directly short-circuits without next()", async () => {
-      registry.addGlobal(function (_c, _next) {
-        return { jsonrpc: "2.0" as const, result: "sync-short-circuit", id: 1 };
-      });
+      registry.addGlobal((_c, _next) => ({
+        jsonrpc: "2.0" as const,
+        result: "sync-short-circuit",
+        id: 1,
+      }));
 
       const handler = vi.fn((c: any) => c.json("ok"));
       const result = await registry.execute("ping", {} as any, handler);
@@ -556,19 +640,21 @@ describe("core/middleware", () => {
     });
 
     test("sync middleware throwing exception is caught by framework and returns -32603", async () => {
-      registry.addGlobal(function (_c, _next) {
+      registry.addGlobal((_c, _next) => {
         throw new TypeError("sync boom");
       });
 
       const handler = vi.fn((c: any) => c.json("ok"));
       const result = await registry.execute("ping", {} as any, handler);
-      expect(result).toMatchObject({ error: { code: -32603, message: "sync boom" } });
+      expect(result).toMatchObject({
+        error: { code: -32603, message: "sync boom" },
+      });
       expect(handler).not.toHaveBeenCalled();
     });
 
     test("next() returns a Promise in sync middleware (not directly void)", async () => {
       let nextReturnValue: unknown = "not-checked";
-      registry.addGlobal(function (_c, next) {
+      registry.addGlobal((_c, next) => {
         // Sync middleware calling next() without await — should get a Promise back
         nextReturnValue = next();
         return nextReturnValue;
@@ -581,14 +667,14 @@ describe("core/middleware", () => {
     });
 
     test("sync middleware returning explicit undefined without calling next() results in -32603", async () => {
-      registry.addGlobal(function (_c, _next) {
-        return undefined;
-      });
+      registry.addGlobal((_c, _next) => undefined);
 
       const handler = vi.fn((c: any) => c.json("ok"));
       const result = await registry.execute("ping", {} as any, handler);
       expect(handler).not.toHaveBeenCalled();
-      expect(result).toMatchObject({ error: { code: -32603, message: "Internal error" } });
+      expect(result).toMatchObject({
+        error: { code: -32603, message: "Internal error" },
+      });
     });
   });
 
@@ -610,9 +696,13 @@ describe("core/middleware", () => {
         }
       });
 
-      const handler = vi.fn(() => { throw new Error("boom"); });
+      const handler = vi.fn(() => {
+        throw new Error("boom");
+      });
       const result = await registry.execute("ping", {} as any, handler);
-      expect(result).toMatchObject({ error: { code: -32000, message: "Handled" } });
+      expect(result).toMatchObject({
+        error: { code: -32000, message: "Handled" },
+      });
     });
 
     test("synchronous middleware works correctly", async () => {
@@ -628,7 +718,11 @@ describe("core/middleware", () => {
         try {
           await next();
         } catch {
-          c.res = { jsonrpc: "2.0" as const, error: { code: -32603, message: "Recovered" }, id: 1 };
+          c.res = {
+            jsonrpc: "2.0" as const,
+            error: { code: -32603, message: "Recovered" },
+            id: 1,
+          };
         }
       });
       registry.addGlobal(async (_c, _next) => {
@@ -637,13 +731,19 @@ describe("core/middleware", () => {
 
       const handler = vi.fn((c: any) => c.json("ok"));
       const result = await registry.execute("ping", {} as any, handler);
-      expect(result).toMatchObject({ error: { code: -32603, message: "Recovered" } });
+      expect(result).toMatchObject({
+        error: { code: -32603, message: "Recovered" },
+      });
     });
 
     test("uncaught exception is caught by framework and returns -32603", async () => {
-      const handler = vi.fn(() => { throw new Error("unhandled"); });
+      const handler = vi.fn(() => {
+        throw new Error("unhandled");
+      });
       const result = await registry.execute("ping", {} as any, handler);
-      expect(result).toMatchObject({ error: { code: -32603, message: "unhandled" } });
+      expect(result).toMatchObject({
+        error: { code: -32603, message: "unhandled" },
+      });
     });
 
     test("sync middleware followed by async middleware works correctly", async () => {
@@ -696,14 +796,18 @@ describe("core/middleware", () => {
         await next();
       });
 
-      const handler = vi.fn(() => { throw originalError; });
+      const handler = vi.fn(() => {
+        throw originalError;
+      });
       const result = await registry.execute("ping", {} as any, handler);
       // Middleware catches and re-throws the exact same error object
       expect(caughtError).toBe(originalError);
       expect(caughtError).toBeInstanceOf(TypeError);
       expect((caughtError as TypeError).message).toBe("custom type error");
       // Framework's outermost catch produces -32603 with the error message
-      expect(result).toMatchObject({ error: { code: -32603, message: "custom type error" } });
+      expect(result).toMatchObject({
+        error: { code: -32603, message: "custom type error" },
+      });
     });
   });
 
@@ -725,9 +829,13 @@ describe("core/middleware", () => {
         }
       });
 
-      const handler = vi.fn(() => { throw new Error("boom"); });
+      const handler = vi.fn(() => {
+        throw new Error("boom");
+      });
       const result = await registry.execute("ping", {} as any, handler);
-      expect(result).toMatchObject({ error: { code: -32603, message: "Internal error" } });
+      expect(result).toMatchObject({
+        error: { code: -32603, message: "Internal error" },
+      });
     });
 
     test("3+ layer middleware chain: exception in handler propagates through all layers in reverse order", async () => {
@@ -758,12 +866,16 @@ describe("core/middleware", () => {
         }
       });
 
-      const handler = vi.fn(() => { throw new Error("deep boom"); });
+      const handler = vi.fn(() => {
+        throw new Error("deep boom");
+      });
       const result = await registry.execute("ping", {} as any, handler);
       // Each layer catches in reverse order (innermost first, then outward)
       expect(catchOrder).toEqual(["layer-3", "layer-2", "layer-1"]);
       // Framework's outermost catch produces -32603
-      expect(result).toMatchObject({ error: { code: -32603, message: "deep boom" } });
+      expect(result).toMatchObject({
+        error: { code: -32603, message: "deep boom" },
+      });
     });
 
     test("middleware catches exception and uses c.error() with data parameter", async () => {
@@ -771,11 +883,16 @@ describe("core/middleware", () => {
         try {
           await next();
         } catch (e) {
-          c.res = c.error(-32000, "Handled with data", { detail: (e as Error).message, stack: "redacted" });
+          c.res = c.error(-32000, "Handled with data", {
+            detail: (e as Error).message,
+            stack: "redacted",
+          });
         }
       });
 
-      const handler = vi.fn(() => { throw new Error("something broke"); });
+      const handler = vi.fn(() => {
+        throw new Error("something broke");
+      });
       const result = await registry.execute("ping", {} as any, handler);
       expect(result).toMatchObject({
         error: {
@@ -854,8 +971,16 @@ describe("core/middleware", () => {
       const ctx = {
         req: { method: "ping", params: {}, id: null },
         res: undefined,
-        json: (data: unknown) => ({ jsonrpc: "2.0" as const, result: data, id: null }),
-        error: (code: number, message: string) => ({ jsonrpc: "2.0" as const, error: { code, message }, id: null }),
+        json: (data: unknown) => ({
+          jsonrpc: "2.0" as const,
+          result: data,
+          id: null,
+        }),
+        error: (code: number, message: string) => ({
+          jsonrpc: "2.0" as const,
+          error: { code, message },
+          id: null,
+        }),
       };
       const result = await registry.execute("ping", ctx as any, handler);
       // id is null, not undefined — this is a regular request
@@ -904,17 +1029,41 @@ describe("core/middleware", () => {
     test("5+ layers mixing global and scoped middleware execute in exact registration order", async () => {
       const order: string[] = [];
       // Layer 1: global
-      registry.addGlobal(async (_c, next) => { order.push("global-1"); await next(); order.push("global-1-after"); });
+      registry.addGlobal(async (_c, next) => {
+        order.push("global-1");
+        await next();
+        order.push("global-1-after");
+      });
       // Layer 2: scoped (matches)
-      registry.add("admin.*", async (_c, next) => { order.push("scoped-admin.*"); await next(); order.push("scoped-admin.*-after"); });
+      registry.add("admin.*", async (_c, next) => {
+        order.push("scoped-admin.*");
+        await next();
+        order.push("scoped-admin.*-after");
+      });
       // Layer 3: global
-      registry.addGlobal(async (_c, next) => { order.push("global-2"); await next(); order.push("global-2-after"); });
+      registry.addGlobal(async (_c, next) => {
+        order.push("global-2");
+        await next();
+        order.push("global-2-after");
+      });
       // Layer 4: scoped (matches)
-      registry.add("*.delete", async (_c, next) => { order.push("scoped-*.delete"); await next(); order.push("scoped-*.delete-after"); });
+      registry.add("*.delete", async (_c, next) => {
+        order.push("scoped-*.delete");
+        await next();
+        order.push("scoped-*.delete-after");
+      });
       // Layer 5: global
-      registry.addGlobal(async (_c, next) => { order.push("global-3"); await next(); order.push("global-3-after"); });
+      registry.addGlobal(async (_c, next) => {
+        order.push("global-3");
+        await next();
+        order.push("global-3-after");
+      });
       // Layer 6: scoped (does NOT match)
-      registry.add("user.*", async (_c, next) => { order.push("scoped-user.*"); await next(); order.push("scoped-user.*-after"); });
+      registry.add("user.*", async (_c, next) => {
+        order.push("scoped-user.*");
+        await next();
+        order.push("scoped-user.*-after");
+      });
 
       const handler = vi.fn((c: any) => {
         order.push("handler");
@@ -942,12 +1091,30 @@ describe("core/middleware", () => {
 
     test("6 layers with some scoped not matching are skipped transparently", async () => {
       const order: string[] = [];
-      registry.addGlobal(async (_c, next) => { order.push("G1"); await next(); });
-      registry.add("admin.**", async (_c, next) => { order.push("S-admin.**"); await next(); });
-      registry.addGlobal(async (_c, next) => { order.push("G2"); await next(); });
-      registry.add("user.*", async (_c, next) => { order.push("S-user.*"); await next(); });
-      registry.add("**.get", async (_c, next) => { order.push("S-**.get"); await next(); });
-      registry.addGlobal(async (_c, next) => { order.push("G3"); await next(); });
+      registry.addGlobal(async (_c, next) => {
+        order.push("G1");
+        await next();
+      });
+      registry.add("admin.**", async (_c, next) => {
+        order.push("S-admin.**");
+        await next();
+      });
+      registry.addGlobal(async (_c, next) => {
+        order.push("G2");
+        await next();
+      });
+      registry.add("user.*", async (_c, next) => {
+        order.push("S-user.*");
+        await next();
+      });
+      registry.add("**.get", async (_c, next) => {
+        order.push("S-**.get");
+        await next();
+      });
+      registry.addGlobal(async (_c, next) => {
+        order.push("G3");
+        await next();
+      });
 
       const handler = vi.fn((c: any) => c.json("ok"));
 
@@ -958,12 +1125,19 @@ describe("core/middleware", () => {
 
     test("interleaved global and scoped: scoped middleware can short-circuit before later global runs", async () => {
       const order: string[] = [];
-      registry.addGlobal(async (c, next) => { order.push("G1"); await next(); order.push("G1-after"); });
+      registry.addGlobal(async (c, next) => {
+        order.push("G1");
+        await next();
+        order.push("G1-after");
+      });
       registry.add("admin.*", (_c, _next) => {
         order.push("S-admin.*-shortcircuit");
         return { jsonrpc: "2.0" as const, result: "blocked", id: 1 };
       });
-      registry.addGlobal(async (_c, next) => { order.push("G2"); await next(); });
+      registry.addGlobal(async (_c, next) => {
+        order.push("G2");
+        await next();
+      });
 
       const handler = vi.fn((c: any) => c.json("ok"));
       const result = await registry.execute("admin.delete", {} as any, handler);
@@ -985,7 +1159,10 @@ describe("core/middleware", () => {
 
     test("**.delete pattern fires during execution with matching deep method", async () => {
       const spy = vi.fn();
-      registry.add("**.delete", async (_c, next) => { spy(); await next(); });
+      registry.add("**.delete", async (_c, next) => {
+        spy();
+        await next();
+      });
 
       const handler = vi.fn((c: any) => c.json("ok"));
 
@@ -1019,30 +1196,63 @@ describe("core/middleware", () => {
       const ctx1 = {
         req: { method: "admin.user.delete", params: {}, id: 1 },
         res: undefined as any,
-        json: (data: unknown) => ({ jsonrpc: "2.0" as const, result: data, id: 1 }),
-        error: (code: number, message: string) => ({ jsonrpc: "2.0" as const, error: { code, message }, id: 1 }),
+        json: (data: unknown) => ({
+          jsonrpc: "2.0" as const,
+          result: data,
+          id: 1,
+        }),
+        error: (code: number, message: string) => ({
+          jsonrpc: "2.0" as const,
+          error: { code, message },
+          id: 1,
+        }),
       };
-      const result1 = await registry.execute("admin.user.delete", ctx1 as any, handler);
-      expect(result1).toMatchObject({ error: { code: -32000, message: "Unauthorized delete" } });
+      const result1 = await registry.execute(
+        "admin.user.delete",
+        ctx1 as any,
+        handler,
+      );
+      expect(result1).toMatchObject({
+        error: { code: -32000, message: "Unauthorized delete" },
+      });
       expect(handler).not.toHaveBeenCalled();
 
       handler.mockClear();
 
       // With authorized param
       const ctx2 = {
-        req: { method: "admin.user.delete", params: { authorized: true }, id: 2 },
+        req: {
+          method: "admin.user.delete",
+          params: { authorized: true },
+          id: 2,
+        },
         res: undefined as any,
-        json: (data: unknown) => ({ jsonrpc: "2.0" as const, result: data, id: 2 }),
-        error: (code: number, message: string) => ({ jsonrpc: "2.0" as const, error: { code, message }, id: 2 }),
+        json: (data: unknown) => ({
+          jsonrpc: "2.0" as const,
+          result: data,
+          id: 2,
+        }),
+        error: (code: number, message: string) => ({
+          jsonrpc: "2.0" as const,
+          error: { code, message },
+          id: 2,
+        }),
       };
-      const result2 = await registry.execute("admin.user.delete", ctx2 as any, handler);
+      const result2 = await registry.execute(
+        "admin.user.delete",
+        ctx2 as any,
+        handler,
+      );
       expect(result2).toMatchObject({ result: { deleted: true } });
       expect(handler).toHaveBeenCalledTimes(1);
     });
 
     test("**.delete does not fire for non-matching methods during execution", async () => {
       const spy = vi.fn();
-      registry.add("**.delete", async (_c, next) => { spy(); await next(); });
+      registry.add("**.delete", async (_c, next) => {
+        spy();
+        await next();
+      });
 
       const handler = vi.fn((c: any) => c.json("ok"));
 
@@ -1064,47 +1274,85 @@ describe("core/middleware", () => {
     });
 
     test("3 layers: each middleware observes c.res progression before/after next()", async () => {
-      const observations: { layer: string; before: unknown; after: unknown }[] = [];
+      const observations: { layer: string; before: unknown; after: unknown }[] =
+        [];
 
       // Outer layer
       registry.addGlobal(async (c, next) => {
         observations.push({ layer: "outer", before: c.res, after: "pending" });
         await next();
-        observations.push({ layer: "outer", before: "done", after: structuredClone(c.res) });
+        observations.push({
+          layer: "outer",
+          before: "done",
+          after: structuredClone(c.res),
+        });
       });
 
       // Middle layer — replaces c.res after next()
       registry.addGlobal(async (c, next) => {
         observations.push({ layer: "middle", before: c.res, after: "pending" });
         await next();
-        observations.push({ layer: "middle", before: "done", after: structuredClone(c.res) });
+        observations.push({
+          layer: "middle",
+          before: "done",
+          after: structuredClone(c.res),
+        });
         // Replace c.res
-        c.res = { jsonrpc: "2.0" as const, result: "modified-by-middle", id: 1 };
+        c.res = {
+          jsonrpc: "2.0" as const,
+          result: "modified-by-middle",
+          id: 1,
+        };
       });
 
       // Inner layer
       registry.addGlobal(async (c, next) => {
         observations.push({ layer: "inner", before: c.res, after: "pending" });
         await next();
-        observations.push({ layer: "inner", before: "done", after: structuredClone(c.res) });
+        observations.push({
+          layer: "inner",
+          before: "done",
+          after: structuredClone(c.res),
+        });
       });
 
       const handler = vi.fn((c: any) => c.json("handler-result"));
       const result = await registry.execute("ping", {} as any, handler);
 
       // Before next(): c.res is undefined for all layers
-      expect(observations[0]).toEqual({ layer: "outer", before: undefined, after: "pending" });
-      expect(observations[1]).toEqual({ layer: "middle", before: undefined, after: "pending" });
-      expect(observations[2]).toEqual({ layer: "inner", before: undefined, after: "pending" });
+      expect(observations[0]).toEqual({
+        layer: "outer",
+        before: undefined,
+        after: "pending",
+      });
+      expect(observations[1]).toEqual({
+        layer: "middle",
+        before: undefined,
+        after: "pending",
+      });
+      expect(observations[2]).toEqual({
+        layer: "inner",
+        before: undefined,
+        after: "pending",
+      });
 
       // After next() for inner: sees handler result
-      expect(observations[3]).toMatchObject({ layer: "inner", after: { result: "handler-result" } });
+      expect(observations[3]).toMatchObject({
+        layer: "inner",
+        after: { result: "handler-result" },
+      });
 
       // After next() for middle: sees handler result (before it replaces)
-      expect(observations[4]).toMatchObject({ layer: "middle", after: { result: "handler-result" } });
+      expect(observations[4]).toMatchObject({
+        layer: "middle",
+        after: { result: "handler-result" },
+      });
 
       // After next() for outer: sees the modified result from middle
-      expect(observations[5]).toMatchObject({ layer: "outer", after: { result: "modified-by-middle" } });
+      expect(observations[5]).toMatchObject({
+        layer: "outer",
+        after: { result: "modified-by-middle" },
+      });
 
       // Final result reflects the outermost c.res
       expect(result).toMatchObject({ result: "modified-by-middle" });
@@ -1178,8 +1426,16 @@ describe("core/middleware", () => {
       const ctx = {
         req: { method: "ping", params: {}, id: 0 },
         res: undefined as any,
-        json: (data: unknown) => ({ jsonrpc: "2.0" as const, result: data, id: 0 }),
-        error: (code: number, message: string) => ({ jsonrpc: "2.0" as const, error: { code, message }, id: 0 }),
+        json: (data: unknown) => ({
+          jsonrpc: "2.0" as const,
+          result: data,
+          id: 0,
+        }),
+        error: (code: number, message: string) => ({
+          jsonrpc: "2.0" as const,
+          error: { code, message },
+          id: 0,
+        }),
       };
       const result = await registry.execute("ping", ctx as any, handler);
       expect(capturedId).toBe(0);
@@ -1198,8 +1454,16 @@ describe("core/middleware", () => {
       const ctx = {
         req: { method: "ping", params: {}, id: "" },
         res: undefined as any,
-        json: (data: unknown) => ({ jsonrpc: "2.0" as const, result: data, id: "" }),
-        error: (code: number, message: string) => ({ jsonrpc: "2.0" as const, error: { code, message }, id: "" }),
+        json: (data: unknown) => ({
+          jsonrpc: "2.0" as const,
+          result: data,
+          id: "",
+        }),
+        error: (code: number, message: string) => ({
+          jsonrpc: "2.0" as const,
+          error: { code, message },
+          id: "",
+        }),
       };
       const result = await registry.execute("ping", ctx as any, handler);
       expect(capturedId).toBe("");
@@ -1220,8 +1484,16 @@ describe("core/middleware", () => {
       const ctx = {
         req: { method: "ping", params: {}, id: undefined },
         res: undefined as any,
-        json: (data: unknown) => ({ jsonrpc: "2.0" as const, result: data, id: null }),
-        error: (code: number, message: string) => ({ jsonrpc: "2.0" as const, error: { code, message }, id: null }),
+        json: (data: unknown) => ({
+          jsonrpc: "2.0" as const,
+          result: data,
+          id: null,
+        }),
+        error: (code: number, message: string) => ({
+          jsonrpc: "2.0" as const,
+          error: { code, message },
+          id: null,
+        }),
       };
       const result = await registry.execute("ping", ctx as any, handler);
       expect(capturedId).toBeUndefined();
@@ -1232,7 +1504,7 @@ describe("core/middleware", () => {
     });
 
     test("id: 0 vs id: undefined distinction is visible in middleware", async () => {
-      const ids: (unknown)[] = [];
+      const ids: unknown[] = [];
       registry.addGlobal(async (c, next) => {
         ids.push(c.req.id);
         await next();
@@ -1244,8 +1516,16 @@ describe("core/middleware", () => {
       const ctx0 = {
         req: { method: "ping", params: {}, id: 0 },
         res: undefined as any,
-        json: (data: unknown) => ({ jsonrpc: "2.0" as const, result: data, id: 0 }),
-        error: (code: number, message: string) => ({ jsonrpc: "2.0" as const, error: { code, message }, id: 0 }),
+        json: (data: unknown) => ({
+          jsonrpc: "2.0" as const,
+          result: data,
+          id: 0,
+        }),
+        error: (code: number, message: string) => ({
+          jsonrpc: "2.0" as const,
+          error: { code, message },
+          id: 0,
+        }),
       };
       await registry.execute("ping", ctx0 as any, handler);
 
@@ -1253,8 +1533,16 @@ describe("core/middleware", () => {
       const ctxUndef = {
         req: { method: "ping", params: {}, id: undefined },
         res: undefined as any,
-        json: (data: unknown) => ({ jsonrpc: "2.0" as const, result: data, id: null }),
-        error: (code: number, message: string) => ({ jsonrpc: "2.0" as const, error: { code, message }, id: null }),
+        json: (data: unknown) => ({
+          jsonrpc: "2.0" as const,
+          result: data,
+          id: null,
+        }),
+        error: (code: number, message: string) => ({
+          jsonrpc: "2.0" as const,
+          error: { code, message },
+          id: null,
+        }),
       };
       await registry.execute("ping", ctxUndef as any, handler);
 
@@ -1274,8 +1562,16 @@ describe("core/middleware", () => {
       const ctx = {
         req: { method: "ping", params: {}, id: null },
         res: undefined as any,
-        json: (data: unknown) => ({ jsonrpc: "2.0" as const, result: data, id: null }),
-        error: (code: number, message: string) => ({ jsonrpc: "2.0" as const, error: { code, message }, id: null }),
+        json: (data: unknown) => ({
+          jsonrpc: "2.0" as const,
+          result: data,
+          id: null,
+        }),
+        error: (code: number, message: string) => ({
+          jsonrpc: "2.0" as const,
+          error: { code, message },
+          id: null,
+        }),
       };
       const result = await registry.execute("ping", ctx as any, handler);
       expect(capturedId).toBeNull();
@@ -1318,12 +1614,18 @@ describe("core/middleware", () => {
       });
 
       // Handler throws
-      const handler = vi.fn(() => { throw new Error("handler-boom"); });
+      const handler = vi.fn(() => {
+        throw new Error("handler-boom");
+      });
       const result = await registry.execute("ping", {} as any, handler);
 
       // Outer should see the error response set by middle
-      expect(outerSeenRes).toMatchObject({ error: { code: -32000, message: "Caught by middle" } });
-      expect(result).toMatchObject({ error: { code: -32000, message: "Caught by middle" } });
+      expect(outerSeenRes).toMatchObject({
+        error: { code: -32000, message: "Caught by middle" },
+      });
+      expect(result).toMatchObject({
+        error: { code: -32000, message: "Caught by middle" },
+      });
     });
 
     test("inner throw -> middle catches, sets c.res, outer replaces c.res", async () => {
@@ -1342,7 +1644,9 @@ describe("core/middleware", () => {
         }
       });
 
-      const handler = vi.fn(() => { throw new Error("boom"); });
+      const handler = vi.fn(() => {
+        throw new Error("boom");
+      });
       const result = await registry.execute("ping", {} as any, handler);
       expect(result).toMatchObject({ result: "outer-override" });
     });
@@ -1373,7 +1677,9 @@ describe("core/middleware", () => {
       const result = await registry.execute("ping", {} as any, handler);
       expect(outerCaughtError).toBeInstanceOf(Error);
       expect((outerCaughtError as Error).message).toBe("inner-explosion");
-      expect(result).toMatchObject({ error: { code: -32603, message: "Outer recovered" } });
+      expect(result).toMatchObject({
+        error: { code: -32603, message: "Outer recovered" },
+      });
     });
   });
 
@@ -1409,13 +1715,17 @@ describe("core/middleware", () => {
       });
 
       // Handler throws original error
-      const handler = vi.fn(() => { throw new Error("original-error"); });
+      const handler = vi.fn(() => {
+        throw new Error("original-error");
+      });
       const result = await registry.execute("ping", {} as any, handler);
 
       // Outer should catch the new TypeError, not the original Error
       expect(outerCaughtError).toBeInstanceOf(TypeError);
       expect((outerCaughtError as TypeError).message).toBe("transformed-error");
-      expect(result).toMatchObject({ error: { code: -32603, message: "transformed-error" } });
+      expect(result).toMatchObject({
+        error: { code: -32603, message: "transformed-error" },
+      });
     });
 
     test("re-thrown error is caught by framework and returns -32603 when no outer catch", async () => {
@@ -1428,9 +1738,13 @@ describe("core/middleware", () => {
         }
       });
 
-      const handler = vi.fn(() => { throw new Error("original"); });
+      const handler = vi.fn(() => {
+        throw new Error("original");
+      });
       const result = await registry.execute("ping", {} as any, handler);
-      expect(result).toMatchObject({ error: { code: -32603, message: "re-thrown-error" } });
+      expect(result).toMatchObject({
+        error: { code: -32603, message: "re-thrown-error" },
+      });
     });
 
     test("chain: inner throws A, middle catches A and throws B, outer catches B and throws C", async () => {
@@ -1454,10 +1768,14 @@ describe("core/middleware", () => {
         }
       });
 
-      const handler = vi.fn(() => { throw new Error("error-A"); });
+      const handler = vi.fn(() => {
+        throw new Error("error-A");
+      });
       const result = await registry.execute("ping", {} as any, handler);
       // Framework's outermost catch produces -32603 with error-C's message
-      expect(result).toMatchObject({ error: { code: -32603, message: "error-C" } });
+      expect(result).toMatchObject({
+        error: { code: -32603, message: "error-C" },
+      });
     });
   });
 
@@ -1569,7 +1887,9 @@ describe("core/middleware", () => {
 
     test("handler throws with no middleware at all → framework returns -32603", async () => {
       // No middleware registered
-      const handler = vi.fn(() => { throw new Error("handler-uncaught"); });
+      const handler = vi.fn(() => {
+        throw new Error("handler-uncaught");
+      });
       const result = await registry.execute("ping", {} as any, handler);
       expect(result).toMatchObject({
         jsonrpc: "2.0",
@@ -1607,8 +1927,16 @@ describe("core/middleware", () => {
       const ctx = {
         req: { method: "ping", params: {}, id: 42 },
         res: undefined as any,
-        json: (data: unknown) => ({ jsonrpc: "2.0" as const, result: data, id: 42 }),
-        error: (code: number, message: string) => ({ jsonrpc: "2.0" as const, error: { code, message }, id: 42 }),
+        json: (data: unknown) => ({
+          jsonrpc: "2.0" as const,
+          result: data,
+          id: 42,
+        }),
+        error: (code: number, message: string) => ({
+          jsonrpc: "2.0" as const,
+          error: { code, message },
+          id: 42,
+        }),
       };
 
       registry.addGlobal(async (_c, _next) => {
@@ -1701,12 +2029,16 @@ describe("core/middleware", () => {
       });
 
       // Handler throws Error A
-      const handler = vi.fn(() => { throw new Error("original-handler-error"); });
+      const handler = vi.fn(() => {
+        throw new Error("original-handler-error");
+      });
       const result = await registry.execute("ping", {} as any, handler);
 
       // Outer sees the transformed error (B), not the original (A)
       expect(outerCaughtError).toBeInstanceOf(RangeError);
-      expect((outerCaughtError as RangeError).message).toBe("transformed-by-middle");
+      expect((outerCaughtError as RangeError).message).toBe(
+        "transformed-by-middle",
+      );
       expect(result).toMatchObject({
         error: { code: -32603, message: "transformed-by-middle" },
       });
@@ -1726,15 +2058,30 @@ describe("core/middleware", () => {
       const order: string[] = [];
 
       // Pattern 1: admin.** (matches admin.delete)
-      registry.add("admin.**", async (_c, next) => { order.push("admin.**"); await next(); });
+      registry.add("admin.**", async (_c, next) => {
+        order.push("admin.**");
+        await next();
+      });
       // Pattern 2: **.delete (matches admin.delete)
-      registry.add("**.delete", async (_c, next) => { order.push("**.delete"); await next(); });
+      registry.add("**.delete", async (_c, next) => {
+        order.push("**.delete");
+        await next();
+      });
       // Pattern 3: *.* (matches admin.delete — exactly 2 segments)
-      registry.add("*.*", async (_c, next) => { order.push("*.*"); await next(); });
+      registry.add("*.*", async (_c, next) => {
+        order.push("*.*");
+        await next();
+      });
       // Pattern 4: admin.* (matches admin.delete)
-      registry.add("admin.*", async (_c, next) => { order.push("admin.*"); await next(); });
+      registry.add("admin.*", async (_c, next) => {
+        order.push("admin.*");
+        await next();
+      });
       // Pattern 5: ** (matches everything)
-      registry.add("**", async (_c, next) => { order.push("**"); await next(); });
+      registry.add("**", async (_c, next) => {
+        order.push("**");
+        await next();
+      });
 
       const handler = vi.fn((c: any) => {
         order.push("handler");
@@ -1743,18 +2090,40 @@ describe("core/middleware", () => {
       const result = await registry.execute("admin.delete", {} as any, handler);
 
       // All 5 should execute in registration order, followed by the handler
-      expect(order).toEqual(["admin.**", "**.delete", "*.*", "admin.*", "**", "handler"]);
+      expect(order).toEqual([
+        "admin.**",
+        "**.delete",
+        "*.*",
+        "admin.*",
+        "**",
+        "handler",
+      ]);
       expect(result).toMatchObject({ result: "ok" });
     });
 
     test("5 scoped patterns: non-matching method skips all 5", async () => {
       const order: string[] = [];
 
-      registry.add("admin.**", async (_c, next) => { order.push("admin.**"); await next(); });
-      registry.add("**.delete", async (_c, next) => { order.push("**.delete"); await next(); });
-      registry.add("*.*", async (_c, next) => { order.push("*.*"); await next(); });
-      registry.add("admin.*", async (_c, next) => { order.push("admin.*"); await next(); });
-      registry.add("**", async (_c, next) => { order.push("**"); await next(); });
+      registry.add("admin.**", async (_c, next) => {
+        order.push("admin.**");
+        await next();
+      });
+      registry.add("**.delete", async (_c, next) => {
+        order.push("**.delete");
+        await next();
+      });
+      registry.add("*.*", async (_c, next) => {
+        order.push("*.*");
+        await next();
+      });
+      registry.add("admin.*", async (_c, next) => {
+        order.push("admin.*");
+        await next();
+      });
+      registry.add("**", async (_c, next) => {
+        order.push("**");
+        await next();
+      });
 
       const handler = vi.fn((c: any) => {
         order.push("handler");
@@ -1769,11 +2138,31 @@ describe("core/middleware", () => {
     test("5 scoped patterns with onion model (before + after) execute in correct order", async () => {
       const order: string[] = [];
 
-      registry.add("admin.**", async (_c, next) => { order.push("admin.**-before"); await next(); order.push("admin.**-after"); });
-      registry.add("**.delete", async (_c, next) => { order.push("**.delete-before"); await next(); order.push("**.delete-after"); });
-      registry.add("*.*", async (_c, next) => { order.push("*.*-before"); await next(); order.push("*.*-after"); });
-      registry.add("admin.*", async (_c, next) => { order.push("admin.*-before"); await next(); order.push("admin.*-after"); });
-      registry.add("**", async (_c, next) => { order.push("**-before"); await next(); order.push("**-after"); });
+      registry.add("admin.**", async (_c, next) => {
+        order.push("admin.**-before");
+        await next();
+        order.push("admin.**-after");
+      });
+      registry.add("**.delete", async (_c, next) => {
+        order.push("**.delete-before");
+        await next();
+        order.push("**.delete-after");
+      });
+      registry.add("*.*", async (_c, next) => {
+        order.push("*.*-before");
+        await next();
+        order.push("*.*-after");
+      });
+      registry.add("admin.*", async (_c, next) => {
+        order.push("admin.*-before");
+        await next();
+        order.push("admin.*-after");
+      });
+      registry.add("**", async (_c, next) => {
+        order.push("**-before");
+        await next();
+        order.push("**-after");
+      });
 
       const handler = vi.fn((c: any) => {
         order.push("handler");
@@ -1926,7 +2315,11 @@ describe("core/middleware", () => {
       const result = await registry.execute("ping", {} as any, handler);
       expect(result).toMatchObject({
         jsonrpc: "2.0",
-        error: { code: -32000, message: "Custom error", data: { detail: "extra" } },
+        error: {
+          code: -32000,
+          message: "Custom error",
+          data: { detail: "extra" },
+        },
       });
       expect("data" in (result as any).error).toBe(true);
     });
@@ -2051,7 +2444,11 @@ describe("core/middleware", () => {
         // json() should be available from createContext
         return c.json({ value: 42 });
       };
-      const result = await registry.execute("test.method", { key: "value" } as any, handler);
+      const result = await registry.execute(
+        "test.method",
+        { key: "value" } as any,
+        handler,
+      );
       expect(result).toMatchObject({
         jsonrpc: "2.0",
         result: { value: 42 },
@@ -2120,15 +2517,27 @@ describe("core/middleware", () => {
 
     test("_lastError is reset to undefined after a successful execute() following a failed one", async () => {
       // First execute: handler throws → _lastError is set
-      const failingHandler = vi.fn(() => { throw new Error("fail"); });
-      const errorResult = await registry.execute("ping", {} as any, failingHandler);
-      expect(errorResult).toMatchObject({ error: { code: -32603, message: "fail" } });
+      const failingHandler = vi.fn(() => {
+        throw new Error("fail");
+      });
+      const errorResult = await registry.execute(
+        "ping",
+        {} as any,
+        failingHandler,
+      );
+      expect(errorResult).toMatchObject({
+        error: { code: -32603, message: "fail" },
+      });
       expect(registry._lastError).toBeInstanceOf(Error);
       expect((registry._lastError as Error).message).toBe("fail");
 
       // Second execute: handler succeeds → _lastError is reset to undefined
       const succeedingHandler = vi.fn((c: any) => c.json("ok"));
-      const successResult = await registry.execute("ping", {} as any, succeedingHandler);
+      const successResult = await registry.execute(
+        "ping",
+        {} as any,
+        succeedingHandler,
+      );
       expect(successResult).toMatchObject({ result: "ok" });
       expect(registry._lastError).toBeUndefined();
     });
@@ -2189,7 +2598,12 @@ describe("core/middleware", () => {
       await registry.execute("admin.user.delete", {} as any, handler);
       await registry.execute("some.deeply.nested.method", {} as any, handler);
 
-      expect(calls).toEqual(["ping", "user.get", "admin.user.delete", "some.deeply.nested.method"]);
+      expect(calls).toEqual([
+        "ping",
+        "user.get",
+        "admin.user.delete",
+        "some.deeply.nested.method",
+      ]);
       expect(handler).toHaveBeenCalledTimes(4);
     });
   });
@@ -2214,29 +2628,61 @@ describe("core/middleware", () => {
         }
       });
 
-      const handler = vi.fn(() => { throw new Error("notification boom"); });
+      const handler = vi.fn(() => {
+        throw new Error("notification boom");
+      });
       const notificationCtx = {
         req: { method: "log.info", params: {}, id: undefined },
         res: undefined,
-        json: (data: unknown) => ({ jsonrpc: "2.0" as const, result: data, id: null }),
-        error: (code: number, message: string) => ({ jsonrpc: "2.0" as const, error: { code, message }, id: null }),
+        json: (data: unknown) => ({
+          jsonrpc: "2.0" as const,
+          result: data,
+          id: null,
+        }),
+        error: (code: number, message: string) => ({
+          jsonrpc: "2.0" as const,
+          error: { code, message },
+          id: null,
+        }),
       };
-      const result = await registry.execute("log.info", notificationCtx as any, handler);
+      const result = await registry.execute(
+        "log.info",
+        notificationCtx as any,
+        handler,
+      );
       expect(caughtError).toBeInstanceOf(Error);
       expect((caughtError as Error).message).toBe("notification boom");
-      expect(result).toMatchObject({ error: { code: -32000, message: "Caught notification error" } });
+      expect(result).toMatchObject({
+        error: { code: -32000, message: "Caught notification error" },
+      });
     });
 
     test("uncaught handler exception during notification is caught by framework outer catch", async () => {
-      const handler = vi.fn(() => { throw new Error("uncaught notification boom"); });
+      const handler = vi.fn(() => {
+        throw new Error("uncaught notification boom");
+      });
       const notificationCtx = {
         req: { method: "log.info", params: {}, id: undefined },
         res: undefined,
-        json: (data: unknown) => ({ jsonrpc: "2.0" as const, result: data, id: null }),
-        error: (code: number, message: string) => ({ jsonrpc: "2.0" as const, error: { code, message }, id: null }),
+        json: (data: unknown) => ({
+          jsonrpc: "2.0" as const,
+          result: data,
+          id: null,
+        }),
+        error: (code: number, message: string) => ({
+          jsonrpc: "2.0" as const,
+          error: { code, message },
+          id: null,
+        }),
       };
-      const result = await registry.execute("log.info", notificationCtx as any, handler);
-      expect(result).toMatchObject({ error: { code: -32603, message: "uncaught notification boom" } });
+      const result = await registry.execute(
+        "log.info",
+        notificationCtx as any,
+        handler,
+      );
+      expect(result).toMatchObject({
+        error: { code: -32603, message: "uncaught notification boom" },
+      });
     });
   });
 
@@ -2270,7 +2716,9 @@ describe("core/middleware", () => {
       });
 
       // Handler throws
-      const handler = vi.fn(() => { throw new Error("handler-exploded"); });
+      const handler = vi.fn(() => {
+        throw new Error("handler-exploded");
+      });
       const result = await registry.execute("admin.delete", {} as any, handler);
 
       // Scoped middleware was called (it matched)
@@ -2352,8 +2800,16 @@ describe("core/middleware", () => {
       const ctx = {
         req: { method: "ping", params: undefined as any, id: 1 },
         res: undefined as any,
-        json: (data: unknown) => ({ jsonrpc: "2.0" as const, result: data, id: 1 }),
-        error: (code: number, message: string) => ({ jsonrpc: "2.0" as const, error: { code, message }, id: 1 }),
+        json: (data: unknown) => ({
+          jsonrpc: "2.0" as const,
+          result: data,
+          id: 1,
+        }),
+        error: (code: number, message: string) => ({
+          jsonrpc: "2.0" as const,
+          error: { code, message },
+          id: 1,
+        }),
       };
       await registry.execute("ping", ctx as any, handler);
       // Context is used directly — params remains undefined as provided
@@ -2436,13 +2892,31 @@ describe("core/middleware", () => {
       const notificationCtx = {
         req: { method: "log.info", params: { message: "hello" } },
         res: undefined,
-        json: (data: unknown) => ({ jsonrpc: "2.0" as const, result: data, id: null }),
-        error: (code: number, message: string) => ({ jsonrpc: "2.0" as const, error: { code, message }, id: null }),
+        json: (data: unknown) => ({
+          jsonrpc: "2.0" as const,
+          result: data,
+          id: null,
+        }),
+        error: (code: number, message: string) => ({
+          jsonrpc: "2.0" as const,
+          error: { code, message },
+          id: null,
+        }),
       };
-      const result = await registry.execute("log.info", notificationCtx as any, handler);
+      const result = await registry.execute(
+        "log.info",
+        notificationCtx as any,
+        handler,
+      );
 
       // Middleware and handler execute in normal order even for notification
-      expect(order).toEqual(["global-before", "scoped-before", "handler", "scoped-after", "global-after"]);
+      expect(order).toEqual([
+        "global-before",
+        "scoped-before",
+        "handler",
+        "scoped-after",
+        "global-after",
+      ]);
       expect(handler).toHaveBeenCalledTimes(1);
       // Result is produced (dispatch layer decides whether to send it)
       expect(result).toMatchObject({ result: "logged" });
@@ -2450,20 +2924,38 @@ describe("core/middleware", () => {
 
     test("notification with scoped middleware: short-circuit works for notification too", async () => {
       registry.add("log.*", (_c, _next) => {
-        return { jsonrpc: "2.0" as const, error: { code: -32000, message: "Blocked notification" }, id: null };
+        return {
+          jsonrpc: "2.0" as const,
+          error: { code: -32000, message: "Blocked notification" },
+          id: null,
+        };
       });
 
       const handler = vi.fn((c: any) => c.json("ok"));
       const notificationCtx = {
         req: { method: "log.info", params: {} },
         res: undefined,
-        json: (data: unknown) => ({ jsonrpc: "2.0" as const, result: data, id: null }),
-        error: (code: number, message: string) => ({ jsonrpc: "2.0" as const, error: { code, message }, id: null }),
+        json: (data: unknown) => ({
+          jsonrpc: "2.0" as const,
+          result: data,
+          id: null,
+        }),
+        error: (code: number, message: string) => ({
+          jsonrpc: "2.0" as const,
+          error: { code, message },
+          id: null,
+        }),
       };
-      const result = await registry.execute("log.info", notificationCtx as any, handler);
+      const result = await registry.execute(
+        "log.info",
+        notificationCtx as any,
+        handler,
+      );
 
       expect(handler).not.toHaveBeenCalled();
-      expect(result).toMatchObject({ error: { code: -32000, message: "Blocked notification" } });
+      expect(result).toMatchObject({
+        error: { code: -32000, message: "Blocked notification" },
+      });
     });
   });
 
@@ -2478,10 +2970,14 @@ describe("core/middleware", () => {
 
     test("_lastError is set to the thrown Error when handler throws uncaught exception", async () => {
       const thrownError = new Error("uncaught-for-lastError");
-      const handler = vi.fn(() => { throw thrownError; });
+      const handler = vi.fn(() => {
+        throw thrownError;
+      });
       const result = await registry.execute("ping", {} as any, handler);
 
-      expect(result).toMatchObject({ error: { code: -32603, message: "uncaught-for-lastError" } });
+      expect(result).toMatchObject({
+        error: { code: -32603, message: "uncaught-for-lastError" },
+      });
       expect(registry._lastError).toBe(thrownError);
     });
 
@@ -2498,7 +2994,9 @@ describe("core/middleware", () => {
     });
 
     test("_lastError stores non-Error thrown value (string)", async () => {
-      const handler = vi.fn(() => { throw "string-thrown"; });
+      const handler = vi.fn(() => {
+        throw "string-thrown";
+      });
       await registry.execute("ping", {} as any, handler);
 
       expect(registry._lastError).toBe("string-thrown");
@@ -2510,7 +3008,9 @@ describe("core/middleware", () => {
 
     test("_lastError is reset to undefined after successful execute() following a failed one", async () => {
       // First: fail
-      const failHandler = vi.fn(() => { throw new Error("fail"); });
+      const failHandler = vi.fn(() => {
+        throw new Error("fail");
+      });
       await registry.execute("ping", {} as any, failHandler);
       expect(registry._lastError).toBeInstanceOf(Error);
 
@@ -2548,7 +3048,11 @@ describe("core/middleware", () => {
     test("next() called AND error response returned — does not throw", async () => {
       registry.addGlobal(async (_c, next) => {
         await next();
-        return { jsonrpc: "2.0" as const, error: { code: -32000, message: "Post-next error" }, id: 1 };
+        return {
+          jsonrpc: "2.0" as const,
+          error: { code: -32000, message: "Post-next error" },
+          id: 1,
+        };
       });
 
       const handler = vi.fn((c: any) => c.json("ok"));
@@ -2579,7 +3083,11 @@ describe("core/middleware", () => {
       registry.addGlobal(async (c, next) => {
         await next();
         // This return after next() is "undefined behavior" per spec
-        return { jsonrpc: "2.0" as const, result: "inner-returned-after-next", id: 1 };
+        return {
+          jsonrpc: "2.0" as const,
+          result: "inner-returned-after-next",
+          id: 1,
+        };
       });
 
       const handler = vi.fn((c: any) => c.json("handler-result"));
@@ -2601,7 +3109,11 @@ describe("core/middleware", () => {
     test("middleware mutates c.req.params and handler receives the modified value", async () => {
       // Middleware modifies c.req.params before calling next()
       registry.addGlobal(async (c, next) => {
-        c.req.params = { ...c.req.params, injected: "by-middleware", role: "admin" };
+        c.req.params = {
+          ...c.req.params,
+          injected: "by-middleware",
+          role: "admin",
+        };
         await next();
       });
 
@@ -2614,13 +3126,25 @@ describe("core/middleware", () => {
       const ctx = {
         req: { method: "user.get", params: { id: "123" }, id: 1 },
         res: undefined as any,
-        json: (data: unknown) => ({ jsonrpc: "2.0" as const, result: data, id: 1 }),
-        error: (code: number, message: string) => ({ jsonrpc: "2.0" as const, error: { code, message }, id: 1 }),
+        json: (data: unknown) => ({
+          jsonrpc: "2.0" as const,
+          result: data,
+          id: 1,
+        }),
+        error: (code: number, message: string) => ({
+          jsonrpc: "2.0" as const,
+          error: { code, message },
+          id: 1,
+        }),
       };
       const result = await registry.execute("user.get", ctx as any, handler);
 
       // Handler should see the original param plus the middleware-injected ones
-      expect(handlerReceivedParams).toEqual({ id: "123", injected: "by-middleware", role: "admin" });
+      expect(handlerReceivedParams).toEqual({
+        id: "123",
+        injected: "by-middleware",
+        role: "admin",
+      });
       expect(result).toMatchObject({ result: "ok" });
     });
 
@@ -2656,7 +3180,9 @@ describe("core/middleware", () => {
         }
       });
 
-      const handler = vi.fn(() => { throw new Error("handler-exception"); });
+      const handler = vi.fn(() => {
+        throw new Error("handler-exception");
+      });
       const result = await registry.execute("ping", {} as any, handler);
 
       // c.res was never set → framework returns -32603

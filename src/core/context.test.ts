@@ -392,9 +392,9 @@ describe("core/context", () => {
 
     test("accepts message with quotes", () => {
       const ctx = createContext("ping", {}, 1);
-      const response = ctx.error(-32603, 'He said "hello" and she said \'hi\'');
+      const response = ctx.error(-32603, "He said \"hello\" and she said 'hi'");
       expect(response.error.message).toBe(
-        'He said "hello" and she said \'hi\'',
+        "He said \"hello\" and she said 'hi'",
       );
     });
 
@@ -657,7 +657,11 @@ describe("core/context", () => {
       ctx.res = handlerResponse;
 
       // Middleware replaces c.res after next()
-      const overriddenResponse = ctx.json({ id: "123", name: "Alice", cached: true });
+      const overriddenResponse = ctx.json({
+        id: "123",
+        name: "Alice",
+        cached: true,
+      });
       ctx.res = overriddenResponse;
 
       expect(ctx.res).toBe(overriddenResponse);

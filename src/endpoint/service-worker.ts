@@ -71,10 +71,10 @@ function createPortEndpoint(port: MessagePortLike): Endpoint {
   };
 }
 
-export async function serviceWorkerEndpoint(
+export function serviceWorkerEndpoint(
   sw: { postMessage(message: unknown, transfer?: Transferable[]): void },
   options?: ServiceWorkerEndpointOptions,
-): Promise<Endpoint> {
+): Endpoint {
   if (sw == null) {
     throw new Error("Service Worker controller is not available");
   }
@@ -87,49 +87,101 @@ export async function serviceWorkerEndpoint(
     }
   }
 
-  return new Promise<Endpoint>((resolve, reject) => {
-    let timerId: ReturnType<typeof setTimeout> | undefined;
+  const sendBuffer: unknown[] = [];
+  const pendingHandlers: Array<{
+    handler: (message: unknown, event: MessageEvent) => void;
+    active: boolean;
+  }> = [];
 
-    const channel = new MessageChannel();
-    const port = channel.port1;
+  let realEndpoint: Endpoint | undefined;
+  let timedOut = false;
 
-    const ackListener = (event: MessageEvent): void => {
-      const { data } = event;
-      if (
-        data !== null &&
-        typeof data === "object" &&
-        (data as Record<string, unknown>).type === "fractal:ack"
-      ) {
-        if (timerId !== undefined) {
-          clearTimeout(timerId);
-        }
-        port.removeEventListener("message", ackListener);
-        resolve(createPortEndpoint(port as unknown as MessagePortLike));
-      }
-    };
+  const channel = new MessageChannel();
+  const port = channel.port1;
 
-    port.addEventListener("message", ackListener);
-    port.start();
-
-    if (timeout !== undefined && timeout !== Number.POSITIVE_INFINITY) {
-      timerId = setTimeout(() => {
-        port.removeEventListener("message", ackListener);
-        reject(new FractalError("TIMEOUT"));
-      }, timeout);
-    }
-
-    try {
-      sw.postMessage({ type: "fractal:connect" }, [
-        channel.port2 as unknown as Transferable,
-      ]);
-    } catch (err) {
+  const ackListener = (event: MessageEvent): void => {
+    const { data } = event;
+    if (
+      data !== null &&
+      typeof data === "object" &&
+      (data as Record<string, unknown>).type === "fractal:ack"
+    ) {
       if (timerId !== undefined) {
         clearTimeout(timerId);
       }
       port.removeEventListener("message", ackListener);
-      reject(err);
+
+      realEndpoint = createPortEndpoint(port as unknown as MessagePortLike);
+
+      // Connect pending handlers
+      for (const entry of pendingHandlers) {
+        if (entry.active) {
+          realEndpoint.onMessage(entry.handler);
+        }
+      }
+      pendingHandlers.length = 0;
+
+      // Flush buffered messages
+      for (const msg of sendBuffer) {
+        realEndpoint.send(msg);
+      }
+      sendBuffer.length = 0;
     }
-  });
+  };
+
+  port.addEventListener("message", ackListener);
+  port.start();
+
+  let timerId: ReturnType<typeof setTimeout> | undefined;
+
+  if (timeout !== undefined && timeout !== Number.POSITIVE_INFINITY) {
+    timerId = setTimeout(() => {
+      port.removeEventListener("message", ackListener);
+      timedOut = true;
+      sendBuffer.length = 0;
+      pendingHandlers.length = 0;
+    }, timeout);
+  }
+
+  try {
+    sw.postMessage({ type: "fractal:connect" }, [
+      channel.port2 as unknown as Transferable,
+    ]);
+  } catch (err) {
+    if (timerId !== undefined) {
+      clearTimeout(timerId);
+    }
+    port.removeEventListener("message", ackListener);
+    timedOut = true;
+    sendBuffer.length = 0;
+    pendingHandlers.length = 0;
+    throw err;
+  }
+
+  return {
+    send(message: unknown): void {
+      if (realEndpoint) {
+        realEndpoint.send(message);
+        return;
+      }
+      if (timedOut) {
+        throw new FractalError("TIMEOUT");
+      }
+      sendBuffer.push(message);
+    },
+    onMessage(
+      handler: (message: unknown, event: MessageEvent) => void,
+    ): () => void {
+      if (realEndpoint) {
+        return realEndpoint.onMessage(handler);
+      }
+      const entry = { handler, active: true };
+      pendingHandlers.push(entry);
+      return (): void => {
+        entry.active = false;
+      };
+    },
+  };
 }
 
 let currentListener: ((event: MessageEvent) => void) | undefined;

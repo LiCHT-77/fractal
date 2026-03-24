@@ -1,6 +1,12 @@
-import { serve } from "./serve.ts";
 import { Fractal } from "../core/app.ts";
-import { createMockEndpoint, makeRequest, makeNotification, makeSuccessResponse, makeErrorResponse } from "../test-helpers.ts";
+import {
+  createMockEndpoint,
+  makeErrorResponse,
+  makeNotification,
+  makeRequest,
+  makeSuccessResponse,
+} from "../test-helpers.ts";
+import { serve } from "./serve.ts";
 
 // Polyfill vi.waitFor for bun:test compatibility
 async function waitFor(fn: () => void, timeout = 1000): Promise<void> {
@@ -206,7 +212,9 @@ describe("adapter/serve", () => {
     test("no response for notification with missing method (no id)", async () => {
       const app = new Fractal();
       const endpoint = createMockEndpoint();
-      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
 
       serve(app, endpoint);
       endpoint.receive({ jsonrpc: "2.0" }); // no method, no id
@@ -219,7 +227,9 @@ describe("adapter/serve", () => {
     test("console.error called for notification with missing method", async () => {
       const app = new Fractal();
       const endpoint = createMockEndpoint();
-      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
 
       serve(app, endpoint);
       endpoint.receive({ jsonrpc: "2.0" }); // no method, no id → notification-like
@@ -318,7 +328,9 @@ describe("adapter/serve", () => {
         return c.json("done");
       });
       const endpoint = createMockEndpoint();
-      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
 
       const server = serve(app, endpoint);
       endpoint.receive(makeRequest("slow", {}, 1));
@@ -340,7 +352,9 @@ describe("adapter/serve", () => {
         return c.json("done");
       });
       const endpoint = createMockEndpoint();
-      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
 
       // Make send() throw when the handler eventually completes
       endpoint.send.mockImplementation(() => {
@@ -377,7 +391,9 @@ describe("adapter/serve", () => {
       await waitFor(() => {
         expect(endpoint.send).toHaveBeenCalledWith(
           expect.objectContaining({
-            error: expect.objectContaining({ message: "specific error message" }),
+            error: expect.objectContaining({
+              message: "specific error message",
+            }),
           }),
         );
       });
@@ -395,7 +411,10 @@ describe("adapter/serve", () => {
       await waitFor(() => {
         expect(endpoint.send).toHaveBeenCalledWith(
           expect.objectContaining({
-            error: expect.objectContaining({ code: -32603, message: "something broke" }),
+            error: expect.objectContaining({
+              code: -32603,
+              message: "something broke",
+            }),
             id: 1,
           }),
         );
@@ -414,7 +433,10 @@ describe("adapter/serve", () => {
       await waitFor(() => {
         expect(endpoint.send).toHaveBeenCalledWith(
           expect.objectContaining({
-            error: expect.objectContaining({ code: -32603, message: "Internal error" }),
+            error: expect.objectContaining({
+              code: -32603,
+              message: "Internal error",
+            }),
             id: 1,
           }),
         );
@@ -433,7 +455,10 @@ describe("adapter/serve", () => {
       await waitFor(() => {
         expect(endpoint.send).toHaveBeenCalledWith(
           expect.objectContaining({
-            error: expect.objectContaining({ code: -32603, message: "Internal error" }),
+            error: expect.objectContaining({
+              code: -32603,
+              message: "Internal error",
+            }),
             id: 1,
           }),
         );
@@ -452,7 +477,10 @@ describe("adapter/serve", () => {
       await waitFor(() => {
         expect(endpoint.send).toHaveBeenCalledWith(
           expect.objectContaining({
-            error: expect.objectContaining({ code: -32603, message: "Internal error" }),
+            error: expect.objectContaining({
+              code: -32603,
+              message: "Internal error",
+            }),
             id: 1,
           }),
         );
@@ -472,7 +500,10 @@ describe("adapter/serve", () => {
       await waitFor(() => {
         expect(endpoint.send).toHaveBeenCalledWith(
           expect.objectContaining({
-            error: expect.objectContaining({ code: -32603, message: "Internal error" }),
+            error: expect.objectContaining({
+              code: -32603,
+              message: "Internal error",
+            }),
             id: 1,
           }),
         );
@@ -482,7 +513,9 @@ describe("adapter/serve", () => {
     test("continues listening after send() throws", async () => {
       const app = new Fractal().method("ping", (c) => c.json("pong"));
       const endpoint = createMockEndpoint();
-      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
 
       endpoint.send.mockImplementationOnce(() => {
         throw new Error("port closed");
@@ -506,7 +539,9 @@ describe("adapter/serve", () => {
     test("console.error called when send() throws", async () => {
       const app = new Fractal().method("ping", (c) => c.json("pong"));
       const endpoint = createMockEndpoint();
-      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
 
       endpoint.send.mockImplementationOnce(() => {
         throw new Error("port closed");
@@ -529,7 +564,12 @@ describe("adapter/serve", () => {
       const endpoint = createMockEndpoint();
 
       serve(app, endpoint);
-      endpoint.receive({ jsonrpc: "2.0", method: "ping", params: [1, 2, 3], id: 1 });
+      endpoint.receive({
+        jsonrpc: "2.0",
+        method: "ping",
+        params: [1, 2, 3],
+        id: 1,
+      });
 
       await waitFor(() => {
         expect(endpoint.send).toHaveBeenCalledWith(
@@ -563,7 +603,12 @@ describe("adapter/serve", () => {
       const endpoint = createMockEndpoint();
 
       serve(app, endpoint);
-      endpoint.receive({ jsonrpc: "2.0", method: "ping", params: "string", id: 1 });
+      endpoint.receive({
+        jsonrpc: "2.0",
+        method: "ping",
+        params: "string",
+        id: 1,
+      });
 
       await waitFor(() => {
         expect(endpoint.send).toHaveBeenCalledWith(
@@ -597,7 +642,12 @@ describe("adapter/serve", () => {
       const endpoint = createMockEndpoint();
 
       serve(app, endpoint);
-      endpoint.receive({ jsonrpc: "2.0", method: "ping", params: [1, 2], id: 0 });
+      endpoint.receive({
+        jsonrpc: "2.0",
+        method: "ping",
+        params: [1, 2],
+        id: 0,
+      });
 
       await waitFor(() => {
         expect(endpoint.send).toHaveBeenCalledWith(
@@ -695,7 +745,9 @@ describe("adapter/serve", () => {
     test("console.error called for notification with invalid params (no response sent)", async () => {
       const app = new Fractal().method("ping", (c) => c.json("pong"));
       const endpoint = createMockEndpoint();
-      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
 
       serve(app, endpoint);
       // Notification (no id) with invalid params (array)
@@ -716,7 +768,9 @@ describe("adapter/serve", () => {
         throw new Error("handler exploded");
       });
       const endpoint = createMockEndpoint();
-      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
 
       serve(app, endpoint);
       endpoint.receive(makeNotification("boom", {}));
@@ -733,7 +787,9 @@ describe("adapter/serve", () => {
         throw new Error("async handler exploded");
       });
       const endpoint = createMockEndpoint();
-      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
 
       serve(app, endpoint);
       endpoint.receive(makeNotification("asyncBoom", {}));
@@ -774,7 +830,12 @@ describe("adapter/serve", () => {
       const endpoint = createMockEndpoint();
 
       serve(app, endpoint);
-      endpoint.receive({ jsonrpc: "2.0", method: "ping", params: undefined, id: 1 });
+      endpoint.receive({
+        jsonrpc: "2.0",
+        method: "ping",
+        params: undefined,
+        id: 1,
+      });
 
       await waitFor(() => {
         expect(endpoint.send).toHaveBeenCalled();
@@ -852,7 +913,10 @@ describe("adapter/serve", () => {
       await waitFor(() => {
         expect(endpoint.send).toHaveBeenCalledWith(
           expect.objectContaining({
-            error: expect.objectContaining({ code: -32600, message: "Invalid Request" }),
+            error: expect.objectContaining({
+              code: -32600,
+              message: "Invalid Request",
+            }),
             id: 1,
           }),
         );
@@ -866,10 +930,17 @@ describe("adapter/serve", () => {
     test("console.error called when request (with id) has params: [] (array)", async () => {
       const app = new Fractal().method("ping", (c) => c.json("pong"));
       const endpoint = createMockEndpoint();
-      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
 
       serve(app, endpoint);
-      endpoint.receive({ jsonrpc: "2.0", method: "ping", params: [1, 2], id: 1 });
+      endpoint.receive({
+        jsonrpc: "2.0",
+        method: "ping",
+        params: [1, 2],
+        id: 1,
+      });
 
       await waitFor(() => {
         expect(endpoint.send).toHaveBeenCalledWith(
@@ -886,7 +957,9 @@ describe("adapter/serve", () => {
     test("console.error called when request (with id) has params: null", async () => {
       const app = new Fractal().method("ping", (c) => c.json("pong"));
       const endpoint = createMockEndpoint();
-      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
 
       serve(app, endpoint);
       endpoint.receive({ jsonrpc: "2.0", method: "ping", params: null, id: 1 });
@@ -906,7 +979,9 @@ describe("adapter/serve", () => {
     test("console.error called when request (with id) has params: 42 (number)", async () => {
       const app = new Fractal().method("ping", (c) => c.json("pong"));
       const endpoint = createMockEndpoint();
-      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
 
       serve(app, endpoint);
       endpoint.receive({ jsonrpc: "2.0", method: "ping", params: 42, id: 1 });
@@ -926,10 +1001,17 @@ describe("adapter/serve", () => {
     test("console.error called when request (with id) has params: 'string'", async () => {
       const app = new Fractal().method("ping", (c) => c.json("pong"));
       const endpoint = createMockEndpoint();
-      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
 
       serve(app, endpoint);
-      endpoint.receive({ jsonrpc: "2.0", method: "ping", params: "invalid", id: 1 });
+      endpoint.receive({
+        jsonrpc: "2.0",
+        method: "ping",
+        params: "invalid",
+        id: 1,
+      });
 
       await waitFor(() => {
         expect(endpoint.send).toHaveBeenCalledWith(
@@ -952,7 +1034,12 @@ describe("adapter/serve", () => {
       const endpoint = createMockEndpoint();
 
       serve(app, endpoint);
-      endpoint.receive({ jsonrpc: "2.0", method: "ping", params: [1, 2], id: 1 });
+      endpoint.receive({
+        jsonrpc: "2.0",
+        method: "ping",
+        params: [1, 2],
+        id: 1,
+      });
 
       await waitFor(() => {
         expect(endpoint.send).toHaveBeenCalledWith(
@@ -1084,7 +1171,9 @@ describe("adapter/serve", () => {
     test("method: 123 with no id → no response sent, console.error called", async () => {
       const app = new Fractal();
       const endpoint = createMockEndpoint();
-      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
 
       serve(app, endpoint);
       // Notification-like message (no id) with non-string method
@@ -1103,7 +1192,9 @@ describe("adapter/serve", () => {
     test("params: 'string' with no id → no response sent, console.error called", async () => {
       const app = new Fractal().method("ping", (c) => c.json("pong"));
       const endpoint = createMockEndpoint();
-      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
 
       serve(app, endpoint);
       // Notification (no id) with invalid params (string primitive)
@@ -1118,7 +1209,9 @@ describe("adapter/serve", () => {
     test("params: null with no id → no response sent, console.error called", async () => {
       const app = new Fractal().method("ping", (c) => c.json("pong"));
       const endpoint = createMockEndpoint();
-      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
 
       serve(app, endpoint);
       endpoint.receive({ jsonrpc: "2.0", method: "ping", params: null });
@@ -1218,7 +1311,9 @@ describe("adapter/serve", () => {
   describe("handler returns c.error()", () => {
     test("c.error() response is correctly formatted and sent through serve()", async () => {
       const app = new Fractal().method("fail", (c) =>
-        c.error(-32000, "Application error", { detail: "something went wrong" }),
+        c.error(-32000, "Application error", {
+          detail: "something went wrong",
+        }),
       );
       const endpoint = createMockEndpoint();
 
@@ -1264,7 +1359,9 @@ describe("adapter/serve", () => {
     test("same invalid method input: with id sends error response, without id sends nothing", async () => {
       const app = new Fractal();
       const endpoint = createMockEndpoint();
-      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
 
       serve(app, endpoint);
 
@@ -1293,12 +1390,19 @@ describe("adapter/serve", () => {
     test("same invalid params input: with id sends error response, without id sends nothing", async () => {
       const app = new Fractal().method("ping", (c) => c.json("pong"));
       const endpoint = createMockEndpoint();
-      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
 
       serve(app, endpoint);
 
       // Request with id and invalid params (array) → should get -32600 error response
-      endpoint.receive({ jsonrpc: "2.0", method: "ping", params: [1, 2], id: 1 });
+      endpoint.receive({
+        jsonrpc: "2.0",
+        method: "ping",
+        params: [1, 2],
+        id: 1,
+      });
 
       await waitFor(() => {
         expect(endpoint.send).toHaveBeenCalledWith(
@@ -1352,7 +1456,10 @@ describe("adapter/serve", () => {
     test("scoped middleware filters correctly through serve()", async () => {
       const spy = vi.fn();
       const app = new Fractal()
-        .use("admin.*", async (_c, next) => { spy(); await next(); })
+        .use("admin.*", async (_c, next) => {
+          spy();
+          await next();
+        })
         .method("admin.delete", (c) => c.json("deleted"))
         .method("user.get", (c) => c.json("user"));
       const endpoint = createMockEndpoint();
@@ -1386,7 +1493,10 @@ describe("adapter/serve", () => {
       await waitFor(() => {
         expect(endpoint.send).toHaveBeenCalledWith(
           expect.objectContaining({
-            error: expect.objectContaining({ code: -32000, message: "Auth required" }),
+            error: expect.objectContaining({
+              code: -32000,
+              message: "Auth required",
+            }),
             id: 1,
           }),
         );
@@ -1449,7 +1559,9 @@ describe("adapter/serve", () => {
     test("no response sent and no console.error for notification to unregistered method", async () => {
       const app = new Fractal().method("ping", (c) => c.json("pong"));
       const endpoint = createMockEndpoint();
-      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
 
       serve(app, endpoint);
       endpoint.receive(makeNotification("nonexistent", {}));
@@ -1564,7 +1676,10 @@ describe("adapter/serve", () => {
         expect(endpoint.send).toHaveBeenCalledWith(
           expect.objectContaining({
             jsonrpc: "2.0",
-            error: expect.objectContaining({ code: -32600, message: "Invalid Request" }),
+            error: expect.objectContaining({
+              code: -32600,
+              message: "Invalid Request",
+            }),
             id: null,
           }),
         );
@@ -1627,7 +1742,10 @@ describe("adapter/serve", () => {
       await waitFor(() => {
         expect(endpoint.send).toHaveBeenCalledWith(
           expect.objectContaining({
-            error: expect.objectContaining({ code: -32600, message: "Invalid Request" }),
+            error: expect.objectContaining({
+              code: -32600,
+              message: "Invalid Request",
+            }),
             id: 1,
           }),
         );
@@ -1644,7 +1762,10 @@ describe("adapter/serve", () => {
       await waitFor(() => {
         expect(endpoint.send).toHaveBeenCalledWith(
           expect.objectContaining({
-            error: expect.objectContaining({ code: -32600, message: "Invalid Request" }),
+            error: expect.objectContaining({
+              code: -32600,
+              message: "Invalid Request",
+            }),
             id: 1,
           }),
         );
@@ -1661,7 +1782,10 @@ describe("adapter/serve", () => {
       await waitFor(() => {
         expect(endpoint.send).toHaveBeenCalledWith(
           expect.objectContaining({
-            error: expect.objectContaining({ code: -32600, message: "Invalid Request" }),
+            error: expect.objectContaining({
+              code: -32600,
+              message: "Invalid Request",
+            }),
             id: 1,
           }),
         );
@@ -1724,7 +1848,9 @@ describe("adapter/serve", () => {
     test("invalid method (non-string) notification logs descriptive message to console.error", async () => {
       const app = new Fractal();
       const endpoint = createMockEndpoint();
-      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
 
       serve(app, endpoint);
       endpoint.receive({ jsonrpc: "2.0", method: 42 }); // notification with non-string method
@@ -1739,10 +1865,17 @@ describe("adapter/serve", () => {
     test("invalid params (array) on request with id logs 'Invalid params' info including the actual value", async () => {
       const app = new Fractal().method("ping", (c) => c.json("pong"));
       const endpoint = createMockEndpoint();
-      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
 
       serve(app, endpoint);
-      endpoint.receive({ jsonrpc: "2.0", method: "ping", params: [1, 2, 3], id: 1 });
+      endpoint.receive({
+        jsonrpc: "2.0",
+        method: "ping",
+        params: [1, 2, 3],
+        id: 1,
+      });
 
       await waitFor(() => {
         expect(endpoint.send).toHaveBeenCalled();
@@ -1757,7 +1890,9 @@ describe("adapter/serve", () => {
     test("invalid params (null) on request with id logs actual null value as second argument", async () => {
       const app = new Fractal().method("ping", (c) => c.json("pong"));
       const endpoint = createMockEndpoint();
-      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
 
       serve(app, endpoint);
       endpoint.receive({ jsonrpc: "2.0", method: "ping", params: null, id: 1 });
@@ -1774,7 +1909,9 @@ describe("adapter/serve", () => {
     test("invalid params (number) on notification logs actual value as second argument", async () => {
       const app = new Fractal().method("ping", (c) => c.json("pong"));
       const endpoint = createMockEndpoint();
-      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
 
       serve(app, endpoint);
       endpoint.receive({ jsonrpc: "2.0", method: "ping", params: 99 }); // notification
@@ -1798,7 +1935,9 @@ describe("adapter/serve", () => {
         })
         .method("ping", (c) => c.json("pong"));
       const endpoint = createMockEndpoint();
-      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
 
       serve(app, endpoint);
       endpoint.receive(makeNotification("ping", {}));
@@ -1811,7 +1950,9 @@ describe("adapter/serve", () => {
       // Verify the logged error is the middleware error
       const loggedArgs = consoleSpy.mock.calls.flat();
       const foundError = loggedArgs.some(
-        (arg) => arg === middlewareError || (arg instanceof Error && arg.message === "middleware exploded"),
+        (arg) =>
+          arg === middlewareError ||
+          (arg instanceof Error && arg.message === "middleware exploded"),
       );
       expect(foundError).toBe(true);
       consoleSpy.mockRestore();
@@ -1825,7 +1966,9 @@ describe("adapter/serve", () => {
         })
         .method("ping", (c) => c.json("pong"));
       const endpoint = createMockEndpoint();
-      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
 
       serve(app, endpoint);
       endpoint.receive(makeNotification("ping", {}));
@@ -1844,7 +1987,9 @@ describe("adapter/serve", () => {
         })
         .method("ping", (c) => c.json("pong"));
       const endpoint = createMockEndpoint();
-      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
 
       serve(app, endpoint);
       endpoint.receive(makeNotification("ping", {}));
@@ -1913,7 +2058,9 @@ describe("adapter/serve", () => {
 
     test("async handler already in-flight when dispose() is called: response still sent", async () => {
       let resolveHandler!: () => void;
-      const handlerPromise = new Promise<void>((r) => { resolveHandler = r; });
+      const handlerPromise = new Promise<void>((r) => {
+        resolveHandler = r;
+      });
 
       const app = new Fractal().method("slow", async (c) => {
         await handlerPromise;
@@ -1938,7 +2085,11 @@ describe("adapter/serve", () => {
 
       await waitFor(() => {
         expect(endpoint.send).toHaveBeenCalledWith(
-          expect.objectContaining({ jsonrpc: "2.0", result: "completed", id: 1 }),
+          expect.objectContaining({
+            jsonrpc: "2.0",
+            result: "completed",
+            id: 1,
+          }),
         );
       });
 
@@ -1951,10 +2102,14 @@ describe("adapter/serve", () => {
 
   describe("structured clone incompatible value in response", () => {
     test("send() throws on non-cloneable result (function) → console.error logged and listener continues", async () => {
-      const cloneError = new DOMException("Failed to execute 'postMessage': () => {} could not be cloned.");
+      const cloneError = new DOMException(
+        "Failed to execute 'postMessage': () => {} could not be cloned.",
+      );
       const app = new Fractal().method("bad", (c) => c.json({ fn: () => {} }));
       const endpoint = createMockEndpoint();
-      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
 
       // Simulate structured clone failure on first send
       endpoint.send.mockImplementationOnce(() => {
@@ -1977,12 +2132,16 @@ describe("adapter/serve", () => {
     });
 
     test("send() throws on non-cloneable result (Symbol) → console.error logged and listener continues", async () => {
-      const cloneError = new DOMException("Failed to execute 'postMessage': Symbol could not be cloned.");
+      const cloneError = new DOMException(
+        "Failed to execute 'postMessage': Symbol could not be cloned.",
+      );
       const app = new Fractal()
         .method("bad", (c) => c.json({ sym: Symbol("test") }))
         .method("ok", (c) => c.json("fine"));
       const endpoint = createMockEndpoint();
-      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
 
       // First call to send throws (structured clone failure), subsequent calls succeed
       endpoint.send.mockImplementationOnce(() => {
@@ -2034,14 +2193,18 @@ describe("adapter/serve", () => {
     test("send() exception after dispose is logged to console.error with the thrown error", async () => {
       const sendError = new Error("port closed");
       let resolveHandler!: () => void;
-      const handlerPromise = new Promise<void>((r) => { resolveHandler = r; });
+      const handlerPromise = new Promise<void>((r) => {
+        resolveHandler = r;
+      });
 
       const app = new Fractal().method("slow", async (c) => {
         await handlerPromise;
         return c.json("done");
       });
       const endpoint = createMockEndpoint();
-      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
 
       // Make send() always throw (simulating port closed after dispose)
       endpoint.send.mockImplementation(() => {
@@ -2073,14 +2236,18 @@ describe("adapter/serve", () => {
     test("listener does not process new messages after dispose even when send() would throw", async () => {
       const sendError = new Error("port closed");
       let resolveHandler!: () => void;
-      const handlerPromise = new Promise<void>((r) => { resolveHandler = r; });
+      const handlerPromise = new Promise<void>((r) => {
+        resolveHandler = r;
+      });
 
       const app = new Fractal().method("slow", async (c) => {
         await handlerPromise;
         return c.json("done");
       });
       const endpoint = createMockEndpoint();
-      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
 
       endpoint.send.mockImplementation(() => {
         throw sendError;
@@ -2119,7 +2286,9 @@ describe("adapter/serve", () => {
       const sendError = new Error("port closed during error response");
       const app = new Fractal().method("ping", (c) => c.json("pong"));
       const endpoint = createMockEndpoint();
-      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
 
       // First call to send() throws (the -32600 error response), subsequent calls succeed
       endpoint.send.mockImplementationOnce(() => {
@@ -2161,7 +2330,10 @@ describe("adapter/serve", () => {
       await waitFor(() => {
         expect(endpoint.send).toHaveBeenCalledWith(
           expect.objectContaining({
-            error: expect.objectContaining({ code: -32600, message: "Invalid Request" }),
+            error: expect.objectContaining({
+              code: -32600,
+              message: "Invalid Request",
+            }),
             id: 1,
           }),
         );
@@ -2173,12 +2345,20 @@ describe("adapter/serve", () => {
       const endpoint = createMockEndpoint();
 
       serve(app, endpoint);
-      endpoint.receive({ jsonrpc: "2.0", method: "ping", params: false, id: 1 });
+      endpoint.receive({
+        jsonrpc: "2.0",
+        method: "ping",
+        params: false,
+        id: 1,
+      });
 
       await waitFor(() => {
         expect(endpoint.send).toHaveBeenCalledWith(
           expect.objectContaining({
-            error: expect.objectContaining({ code: -32600, message: "Invalid Request" }),
+            error: expect.objectContaining({
+              code: -32600,
+              message: "Invalid Request",
+            }),
             id: 1,
           }),
         );
@@ -2222,7 +2402,9 @@ describe("adapter/serve", () => {
         c.error(-32000, "Application error"),
       );
       const endpoint = createMockEndpoint();
-      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
 
       serve(app, endpoint);
       // Send as notification (no id)
@@ -2255,7 +2437,10 @@ describe("adapter/serve", () => {
       await waitFor(() => {
         expect(endpoint.send).toHaveBeenCalledWith(
           expect.objectContaining({
-            error: expect.objectContaining({ code: -32603, message: "Internal error" }),
+            error: expect.objectContaining({
+              code: -32603,
+              message: "Internal error",
+            }),
             id: 1,
           }),
         );
@@ -2280,7 +2465,10 @@ describe("adapter/serve", () => {
         expect(endpoint.send).toHaveBeenCalledWith(
           expect.objectContaining({
             jsonrpc: "2.0",
-            error: expect.objectContaining({ code: -32600, message: "Invalid Request" }),
+            error: expect.objectContaining({
+              code: -32600,
+              message: "Invalid Request",
+            }),
             id: null,
           }),
         );
@@ -2295,7 +2483,9 @@ describe("adapter/serve", () => {
       const dispatchError = new Error("unexpected dispatch failure");
       const app = new Fractal().method("ping", (c) => c.json("pong"));
       const endpoint = createMockEndpoint();
-      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
 
       serve(app, endpoint);
 
@@ -2415,7 +2605,10 @@ describe("adapter/serve", () => {
         expect(endpoint.send).toHaveBeenCalledWith(
           expect.objectContaining({
             jsonrpc: "2.0",
-            error: expect.objectContaining({ code: -32600, message: "Invalid Request" }),
+            error: expect.objectContaining({
+              code: -32600,
+              message: "Invalid Request",
+            }),
             id: 1,
           }),
         );
@@ -2429,7 +2622,9 @@ describe("adapter/serve", () => {
     test("notification with params: true returns void and console.error is called", async () => {
       const app = new Fractal().method("ping", (c) => c.json("pong"));
       const endpoint = createMockEndpoint();
-      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
 
       serve(app, endpoint);
       // Notification (no id) with params: true (non-object primitive)
@@ -2444,7 +2639,9 @@ describe("adapter/serve", () => {
     test("notification with params: false returns void and console.error is called", async () => {
       const app = new Fractal().method("ping", (c) => c.json("pong"));
       const endpoint = createMockEndpoint();
-      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
 
       serve(app, endpoint);
       // Notification (no id) with params: false (non-object primitive)
@@ -2468,7 +2665,10 @@ describe("adapter/serve", () => {
 
       serve(app, endpoint);
 
-      const eventOverrides = { origin: "https://test.example.com", source: null };
+      const eventOverrides = {
+        origin: "https://test.example.com",
+        source: null,
+      };
       endpoint.receive(makeRequest("ping", {}, 1), eventOverrides);
 
       await waitFor(() => {
@@ -2478,7 +2678,9 @@ describe("adapter/serve", () => {
       // The first argument is the message object, the second is the MessageEvent
       const secondArg = dispatchSpy.mock.calls[0]![1];
       expect(secondArg).toBeDefined();
-      expect((secondArg as MessageEvent).origin).toBe("https://test.example.com");
+      expect((secondArg as MessageEvent).origin).toBe(
+        "https://test.example.com",
+      );
 
       dispatchSpy.mockRestore();
     });

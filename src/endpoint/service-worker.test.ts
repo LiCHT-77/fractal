@@ -1,17 +1,19 @@
-import { serviceWorkerEndpoint, onConnect } from "./service-worker.ts";
 import { FractalError } from "../protocol/errors.ts";
 import {
-  createMockServiceWorker,
   createMockMessagePort,
+  createMockServiceWorker,
   createMockServiceWorkerGlobalScope,
   type MockMessagePort,
   type MockServiceWorkerGlobalScope,
 } from "../test-helpers.ts";
+import { onConnect, serviceWorkerEndpoint } from "./service-worker.ts";
 
 describe("endpoint/service-worker", () => {
   describe("serviceWorkerEndpoint", () => {
     let originalMessageChannel: typeof MessageChannel;
-    let capturedChannel: { port1: MockMessagePort; port2: MockMessagePort } | undefined;
+    let capturedChannel:
+      | { port1: MockMessagePort; port2: MockMessagePort }
+      | undefined;
 
     beforeEach(() => {
       capturedChannel = undefined;
@@ -32,40 +34,36 @@ describe("endpoint/service-worker", () => {
       globalThis.MessageChannel = originalMessageChannel;
     });
 
-    test("throws when controller is null", async () => {
-      await expect(
-        serviceWorkerEndpoint(null as any),
-      ).rejects.toThrow("Service Worker controller is not available");
+    test("throws when controller is null", () => {
+      expect(() => serviceWorkerEndpoint(null as any)).toThrow(
+        "Service Worker controller is not available",
+      );
     });
 
-    test("throws when controller is undefined", async () => {
-      await expect(
-        serviceWorkerEndpoint(undefined as any),
-      ).rejects.toThrow("Service Worker controller is not available");
+    test("throws when controller is undefined", () => {
+      expect(() => serviceWorkerEndpoint(undefined as any)).toThrow(
+        "Service Worker controller is not available",
+      );
     });
 
-    test("returns a promise that resolves to an Endpoint", async () => {
+    test("returns an Endpoint synchronously (not a Promise)", () => {
       const sw = createMockServiceWorker();
-      // The handshake requires a response from the SW side
-      // We simulate this by immediately resolving
-      const promise = serviceWorkerEndpoint(sw as any, { timeout: 1000 });
-      expect(promise).toBeInstanceOf(Promise);
-      // Note: will timeout since we don't simulate the handshake response
-      // Suppress unhandled rejection
-      promise.catch(() => {});
+      const endpoint = serviceWorkerEndpoint(sw as any, { timeout: 1000 });
+      expect(endpoint).not.toBeInstanceOf(Promise);
+      expect(typeof endpoint.send).toBe("function");
+      expect(typeof endpoint.onMessage).toBe("function");
     });
 
-    test("sends handshake message with a port to the service worker", async () => {
+    test("sends handshake message with a port to the service worker", () => {
       const sw = createMockServiceWorker();
-      // Start the handshake (will timeout but we just verify the postMessage call)
-      const promise = serviceWorkerEndpoint(sw as any, { timeout: 100 }).catch(() => {});
-      // Give a tick for the async call
-      await new Promise((r) => setTimeout(r, 10));
+      serviceWorkerEndpoint(sw as any, { timeout: 100 });
       expect(sw.postMessage).toHaveBeenCalled();
     });
 
-    test("transfers port2 (not port1) to the service worker", async () => {
-      let capturedChannel: { port1: MockMessagePort; port2: MockMessagePort } | undefined;
+    test("transfers port2 (not port1) to the service worker", () => {
+      let capturedChannel:
+        | { port1: MockMessagePort; port2: MockMessagePort }
+        | undefined;
       globalThis.MessageChannel = class MockMessageChannel {
         port1: MockMessagePort;
         port2: MockMessagePort;
@@ -77,8 +75,7 @@ describe("endpoint/service-worker", () => {
       } as any;
 
       const sw = createMockServiceWorker();
-      const promise = serviceWorkerEndpoint(sw as any, { timeout: 100 }).catch(() => {});
-      await new Promise((r) => setTimeout(r, 10));
+      serviceWorkerEndpoint(sw as any, { timeout: 100 });
 
       expect(capturedChannel).toBeDefined();
       const transferArg = sw.postMessage.mock.calls[0]?.[1];
@@ -86,67 +83,63 @@ describe("endpoint/service-worker", () => {
       expect(transferArg[0]).not.toBe(capturedChannel!.port1);
     });
 
-    test("rejects with FractalError TIMEOUT when timeout is 0 (immediate)", async () => {
+    test("send() throws FractalError TIMEOUT when timeout is 0 (immediate)", async () => {
       const sw = createMockServiceWorker();
-      await expect(
-        serviceWorkerEndpoint(sw as any, { timeout: 0 }),
-      ).rejects.toMatchObject({ code: "TIMEOUT" });
+      const endpoint = serviceWorkerEndpoint(sw as any, { timeout: 0 });
+      // timeout: 0 fires on next tick
+      await new Promise((r) => setTimeout(r, 10));
+      expect(() => endpoint.send({})).toThrow(FractalError);
     });
 
-    test("rejects with FractalError TIMEOUT when timeout elapses", async () => {
+    test("send() throws FractalError TIMEOUT when timeout elapses", async () => {
       const sw = createMockServiceWorker();
-      await expect(
-        serviceWorkerEndpoint(sw as any, { timeout: 50 }),
-      ).rejects.toMatchObject({ code: "TIMEOUT" });
+      const endpoint = serviceWorkerEndpoint(sw as any, { timeout: 50 });
+      await new Promise((r) => setTimeout(r, 60));
+      expect(() => endpoint.send({})).toThrow(FractalError);
     });
 
-    test("rejects with TypeError for negative timeout", async () => {
+    test("throws TypeError for negative timeout", () => {
       const sw = createMockServiceWorker();
-      await expect(
-        serviceWorkerEndpoint(sw as any, { timeout: -1 }),
-      ).rejects.toThrow(TypeError);
+      expect(() => serviceWorkerEndpoint(sw as any, { timeout: -1 })).toThrow(
+        TypeError,
+      );
     });
 
-    test("rejects with TypeError for NaN timeout", async () => {
+    test("throws TypeError for NaN timeout", () => {
       const sw = createMockServiceWorker();
-      await expect(
+      expect(() =>
         serviceWorkerEndpoint(sw as any, { timeout: Number.NaN }),
-      ).rejects.toThrow(TypeError);
+      ).toThrow(TypeError);
     });
 
-    test("rejects with TypeError for -Infinity timeout", async () => {
+    test("throws TypeError for -Infinity timeout", () => {
       const sw = createMockServiceWorker();
-      await expect(
+      expect(() =>
         serviceWorkerEndpoint(sw as any, { timeout: Number.NEGATIVE_INFINITY }),
-      ).rejects.toThrow(TypeError);
+      ).toThrow(TypeError);
     });
 
     test("Infinity timeout means no timeout", async () => {
       const sw = createMockServiceWorker();
-      // Should not reject immediately (unlike timeout: 0)
-      const promise = serviceWorkerEndpoint(sw as any, { timeout: Number.POSITIVE_INFINITY });
-      // Cancel by racing with a short timer
-      const result = await Promise.race([
-        promise.then(() => "resolved").catch(() => "rejected"),
-        new Promise<string>((r) => setTimeout(() => r("pending"), 50)),
-      ]);
-      expect(result).toBe("pending");
+      const endpoint = serviceWorkerEndpoint(sw as any, {
+        timeout: Number.POSITIVE_INFINITY,
+      });
+      // send() should buffer, not throw
+      await new Promise((r) => setTimeout(r, 50));
+      expect(() => endpoint.send({})).not.toThrow();
     });
 
     test("omitting timeout means no timeout", async () => {
       const sw = createMockServiceWorker();
-      const promise = serviceWorkerEndpoint(sw as any);
-      const result = await Promise.race([
-        promise.then(() => "resolved").catch(() => "rejected"),
-        new Promise<string>((r) => setTimeout(() => r("pending"), 50)),
-      ]);
-      expect(result).toBe("pending");
+      const endpoint = serviceWorkerEndpoint(sw as any);
+      // send() should buffer, not throw
+      await new Promise((r) => setTimeout(r, 50));
+      expect(() => endpoint.send({})).not.toThrow();
     });
 
-    test("postMessage is called with transfer list containing port", async () => {
+    test("postMessage is called with transfer list containing port", () => {
       const sw = createMockServiceWorker();
-      const promise = serviceWorkerEndpoint(sw as any, { timeout: 100 }).catch(() => {});
-      await new Promise((r) => setTimeout(r, 10));
+      serviceWorkerEndpoint(sw as any, { timeout: 100 });
 
       expect(sw.postMessage).toHaveBeenCalled();
       const transferArg = sw.postMessage.mock.calls[0]?.[1];
@@ -154,59 +147,52 @@ describe("endpoint/service-worker", () => {
       expect(transferArg.length).toBeGreaterThanOrEqual(1);
     });
 
-    test("handshake message does not have jsonrpc '2.0'", async () => {
+    test("handshake message does not have jsonrpc '2.0'", () => {
       const sw = createMockServiceWorker();
-      const promise = serviceWorkerEndpoint(sw as any, { timeout: 100 }).catch(() => {});
-      await new Promise((r) => setTimeout(r, 10));
+      serviceWorkerEndpoint(sw as any, { timeout: 100 });
 
       expect(sw.postMessage).toHaveBeenCalled();
-      const handshakeMsg = sw.postMessage.mock.calls[0]?.[0] as Record<string, unknown>;
+      const handshakeMsg = sw.postMessage.mock.calls[0]?.[0] as Record<
+        string,
+        unknown
+      >;
       expect(handshakeMsg?.jsonrpc).not.toBe("2.0");
     });
 
-    test("handshake message has a recognizable fractal type field", async () => {
+    test("handshake message has a recognizable fractal type field", () => {
       const sw = createMockServiceWorker();
-      const promise = serviceWorkerEndpoint(sw as any, { timeout: 100 }).catch(() => {});
-      await new Promise((r) => setTimeout(r, 10));
+      serviceWorkerEndpoint(sw as any, { timeout: 100 });
 
       expect(sw.postMessage).toHaveBeenCalled();
-      const handshakeMsg = sw.postMessage.mock.calls[0]?.[0] as Record<string, unknown>;
+      const handshakeMsg = sw.postMessage.mock.calls[0]?.[0] as Record<
+        string,
+        unknown
+      >;
       // The handshake message should have a type field that starts with "fractal:"
       expect(typeof handshakeMsg?.type).toBe("string");
       expect((handshakeMsg?.type as string).startsWith("fractal:")).toBe(true);
     });
 
-    test("handshake resolves to Endpoint on ack", async () => {
+    test("endpoint works after ack", () => {
       const sw = createMockServiceWorker();
 
-      const promise = serviceWorkerEndpoint(sw as any, { timeout: 5000 });
-      await new Promise((r) => setTimeout(r, 10));
+      const endpoint = serviceWorkerEndpoint(sw as any, { timeout: 5000 });
 
       // Simulate ack from service worker through port1 (the port with listeners)
       expect(capturedChannel).toBeDefined();
       capturedChannel!.port1.dispatchMessage({ type: "fractal:ack" });
 
-      const endpoint = await Promise.race([
-        promise,
-        new Promise<never>((_, rej) => setTimeout(() => rej(new Error("test timeout")), 500)),
-      ]);
       expect(endpoint).toBeDefined();
       expect(typeof endpoint.send).toBe("function");
       expect(typeof endpoint.onMessage).toBe("function");
     });
 
-    test("resolved endpoint.send() sends through port", async () => {
+    test("endpoint.send() sends through port after ack", () => {
       const sw = createMockServiceWorker();
 
-      const promise = serviceWorkerEndpoint(sw as any, { timeout: 5000 });
-      await new Promise((r) => setTimeout(r, 10));
+      const endpoint = serviceWorkerEndpoint(sw as any, { timeout: 5000 });
 
       capturedChannel!.port1.dispatchMessage({ type: "fractal:ack" });
-
-      const endpoint = await Promise.race([
-        promise,
-        new Promise<never>((_, rej) => setTimeout(() => rej(new Error("test timeout")), 500)),
-      ]);
 
       const msg = { jsonrpc: "2.0", method: "ping", id: 1 };
       endpoint.send(msg);
@@ -214,18 +200,12 @@ describe("endpoint/service-worker", () => {
       expect(capturedChannel!.port1.postMessage).toHaveBeenCalledWith(msg);
     });
 
-    test("resolved endpoint.onMessage() receives messages through port", async () => {
+    test("endpoint.onMessage() receives messages through port after ack", () => {
       const sw = createMockServiceWorker();
 
-      const promise = serviceWorkerEndpoint(sw as any, { timeout: 5000 });
-      await new Promise((r) => setTimeout(r, 10));
+      const endpoint = serviceWorkerEndpoint(sw as any, { timeout: 5000 });
 
       capturedChannel!.port1.dispatchMessage({ type: "fractal:ack" });
-
-      const endpoint = await Promise.race([
-        promise,
-        new Promise<never>((_, rej) => setTimeout(() => rej(new Error("test timeout")), 500)),
-      ]);
 
       const handler = vi.fn();
       endpoint.onMessage(handler);
@@ -233,13 +213,18 @@ describe("endpoint/service-worker", () => {
       // Send a JSON-RPC message through the port
       const msg = { jsonrpc: "2.0", method: "hello", id: 2 };
       capturedChannel!.port1.dispatchMessage(msg);
-      expect(handler).toHaveBeenCalledWith(msg, expect.objectContaining({ data: msg }));
+      expect(handler).toHaveBeenCalledWith(
+        msg,
+        expect.objectContaining({ data: msg }),
+      );
     });
 
-    test("timeout rejection is instanceof FractalError", async () => {
+    test("send() throws FractalError with TIMEOUT code after timeout", async () => {
       const sw = createMockServiceWorker();
+      const endpoint = serviceWorkerEndpoint(sw as any, { timeout: 50 });
+      await new Promise((r) => setTimeout(r, 60));
       try {
-        await serviceWorkerEndpoint(sw as any, { timeout: 50 });
+        endpoint.send({});
         expect.unreachable("should have thrown");
       } catch (err) {
         expect(err).toBeInstanceOf(FractalError);
@@ -247,33 +232,40 @@ describe("endpoint/service-worker", () => {
       }
     });
 
-    test("null controller rejection is a plain Error (not FractalError) with exact message", async () => {
+    test("null controller throw is a plain Error (not FractalError) with exact message", () => {
       try {
-        await serviceWorkerEndpoint(null as any);
+        serviceWorkerEndpoint(null as any);
         expect.unreachable("should have thrown");
       } catch (err) {
         expect(err).toBeInstanceOf(Error);
         expect(err).not.toBeInstanceOf(FractalError);
-        expect((err as Error).message).toBe("Service Worker controller is not available");
+        expect((err as Error).message).toBe(
+          "Service Worker controller is not available",
+        );
       }
     });
 
-    test("undefined controller rejection is a plain Error (not FractalError) with exact message", async () => {
+    test("undefined controller throw is a plain Error (not FractalError) with exact message", () => {
       try {
-        await serviceWorkerEndpoint(undefined as any);
+        serviceWorkerEndpoint(undefined as any);
         expect.unreachable("should have thrown");
       } catch (err) {
         expect(err).toBeInstanceOf(Error);
         expect(err).not.toBeInstanceOf(FractalError);
-        expect((err as Error).message).toBe("Service Worker controller is not available");
+        expect((err as Error).message).toBe(
+          "Service Worker controller is not available",
+        );
       }
     });
 
-    test("multiple serviceWorkerEndpoint() calls create independent endpoints", async () => {
+    test("multiple serviceWorkerEndpoint() calls create independent endpoints", () => {
       const sw1 = createMockServiceWorker();
       const sw2 = createMockServiceWorker();
 
-      const capturedChannels: { port1: MockMessagePort; port2: MockMessagePort }[] = [];
+      const capturedChannels: {
+        port1: MockMessagePort;
+        port2: MockMessagePort;
+      }[] = [];
       const origMC = globalThis.MessageChannel;
       globalThis.MessageChannel = class MockMessageChannel {
         port1: MockMessagePort;
@@ -285,91 +277,77 @@ describe("endpoint/service-worker", () => {
         }
       } as any;
 
-      const promise1 = serviceWorkerEndpoint(sw1 as any, { timeout: 5000 });
-      const promise2 = serviceWorkerEndpoint(sw2 as any, { timeout: 5000 });
-      await new Promise((r) => setTimeout(r, 10));
+      const endpoint1 = serviceWorkerEndpoint(sw1 as any, { timeout: 5000 });
+      const endpoint2 = serviceWorkerEndpoint(sw2 as any, { timeout: 5000 });
 
       // Ack both
       capturedChannels[0].port1.dispatchMessage({ type: "fractal:ack" });
       capturedChannels[1].port1.dispatchMessage({ type: "fractal:ack" });
-
-      const endpoint1 = await Promise.race([
-        promise1,
-        new Promise<never>((_, rej) => setTimeout(() => rej(new Error("test timeout")), 500)),
-      ]);
-      const endpoint2 = await Promise.race([
-        promise2,
-        new Promise<never>((_, rej) => setTimeout(() => rej(new Error("test timeout")), 500)),
-      ]);
 
       // Endpoints should be distinct objects
       expect(endpoint1).not.toBe(endpoint2);
 
       // Sending on one does not affect the other
       endpoint1.send({ jsonrpc: "2.0", method: "a", id: 1 });
-      expect(capturedChannels[0].port1.postMessage).toHaveBeenCalledWith({ jsonrpc: "2.0", method: "a", id: 1 });
-      expect(capturedChannels[1].port1.postMessage).not.toHaveBeenCalledWith({ jsonrpc: "2.0", method: "a", id: 1 });
+      expect(capturedChannels[0].port1.postMessage).toHaveBeenCalledWith({
+        jsonrpc: "2.0",
+        method: "a",
+        id: 1,
+      });
+      expect(capturedChannels[1].port1.postMessage).not.toHaveBeenCalledWith({
+        jsonrpc: "2.0",
+        method: "a",
+        id: 1,
+      });
     });
 
     test("timeout: 0.1 (fractional) is valid", async () => {
       const sw = createMockServiceWorker();
       // Should not throw TypeError (fractional values are valid, just very short)
-      await expect(
-        serviceWorkerEndpoint(sw as any, { timeout: 0.1 }),
-      ).rejects.toMatchObject({ code: "TIMEOUT" });
+      const endpoint = serviceWorkerEndpoint(sw as any, { timeout: 0.1 });
+      await new Promise((r) => setTimeout(r, 20));
+      expect(() => endpoint.send({})).toThrow(FractalError);
     });
 
     test("fractional timeout: 1.5 works correctly", async () => {
       const sw = createMockServiceWorker();
       // timeout: 1.5 is a valid fractional value, should not throw TypeError
       // and should eventually timeout with TIMEOUT code
-      await expect(
-        serviceWorkerEndpoint(sw as any, { timeout: 1.5 }),
-      ).rejects.toMatchObject({ code: "TIMEOUT" });
+      const endpoint = serviceWorkerEndpoint(sw as any, { timeout: 1.5 });
+      await new Promise((r) => setTimeout(r, 20));
+      expect(() => endpoint.send({})).toThrow(FractalError);
     });
 
-    test("postMessage failure during handshake rejects the promise", async () => {
+    test("postMessage failure during handshake throws synchronously", () => {
       const sw = createMockServiceWorker();
-      const postMessageError = new DOMException("Failed to execute 'postMessage'");
+      const postMessageError = new DOMException(
+        "Failed to execute 'postMessage'",
+      );
       sw.postMessage.mockImplementation(() => {
         throw postMessageError;
       });
 
-      await expect(
-        serviceWorkerEndpoint(sw as any, { timeout: 5000 }),
-      ).rejects.toThrow("Failed to execute 'postMessage'");
+      expect(() => serviceWorkerEndpoint(sw as any, { timeout: 5000 })).toThrow(
+        "Failed to execute 'postMessage'",
+      );
     });
 
-    test("port.start() is called on the transferred port during handshake", async () => {
+    test("port.start() is called on the transferred port during handshake", () => {
       const sw = createMockServiceWorker();
 
-      const promise = serviceWorkerEndpoint(sw as any, { timeout: 5000 });
-      await new Promise((r) => setTimeout(r, 10));
+      serviceWorkerEndpoint(sw as any, { timeout: 5000 });
 
       // port.start() should have been called to enable the ack listener
       expect(capturedChannel).toBeDefined();
       expect(capturedChannel!.port1.start).toHaveBeenCalled();
-
-      // Resolve the handshake to avoid dangling promise
-      capturedChannel!.port1.dispatchMessage({ type: "fractal:ack" });
-      await Promise.race([
-        promise,
-        new Promise<never>((_, rej) => setTimeout(() => rej(new Error("test timeout")), 500)),
-      ]);
     });
 
-    test("port.start() is called again when endpoint.onMessage() is invoked", async () => {
+    test("port.start() is called again when endpoint.onMessage() is invoked", () => {
       const sw = createMockServiceWorker();
 
-      const promise = serviceWorkerEndpoint(sw as any, { timeout: 5000 });
-      await new Promise((r) => setTimeout(r, 10));
+      const endpoint = serviceWorkerEndpoint(sw as any, { timeout: 5000 });
 
       capturedChannel!.port1.dispatchMessage({ type: "fractal:ack" });
-
-      const endpoint = await Promise.race([
-        promise,
-        new Promise<never>((_, rej) => setTimeout(() => rej(new Error("test timeout")), 500)),
-      ]);
 
       // Clear previous start() calls (from handshake setup)
       capturedChannel!.port1.start.mockClear();
@@ -380,18 +358,12 @@ describe("endpoint/service-worker", () => {
       expect(capturedChannel!.port1.start).toHaveBeenCalled();
     });
 
-    test("non-JSON-RPC messages are filtered out on client-side endpoint", async () => {
+    test("non-JSON-RPC messages are filtered out on client-side endpoint", () => {
       const sw = createMockServiceWorker();
 
-      const promise = serviceWorkerEndpoint(sw as any, { timeout: 5000 });
-      await new Promise((r) => setTimeout(r, 10));
+      const endpoint = serviceWorkerEndpoint(sw as any, { timeout: 5000 });
 
       capturedChannel!.port1.dispatchMessage({ type: "fractal:ack" });
-
-      const endpoint = await Promise.race([
-        promise,
-        new Promise<never>((_, rej) => setTimeout(() => rej(new Error("test timeout")), 500)),
-      ]);
 
       const handler = vi.fn();
       endpoint.onMessage(handler);
@@ -403,8 +375,16 @@ describe("endpoint/service-worker", () => {
       capturedChannel!.port1.dispatchMessage(null);
       capturedChannel!.port1.dispatchMessage(undefined);
       capturedChannel!.port1.dispatchMessage({ method: "ping", id: 1 }); // missing jsonrpc: "2.0"
-      capturedChannel!.port1.dispatchMessage({ jsonrpc: "1.0", method: "ping", id: 1 }); // wrong version
-      capturedChannel!.port1.dispatchMessage({ jsonrpc: 2.0, method: "ping", id: 1 }); // number, not string
+      capturedChannel!.port1.dispatchMessage({
+        jsonrpc: "1.0",
+        method: "ping",
+        id: 1,
+      }); // wrong version
+      capturedChannel!.port1.dispatchMessage({
+        jsonrpc: 2.0,
+        method: "ping",
+        id: 1,
+      }); // number, not string
 
       expect(handler).not.toHaveBeenCalled();
 
@@ -412,21 +392,18 @@ describe("endpoint/service-worker", () => {
       const validMsg = { jsonrpc: "2.0", method: "ping", id: 1 };
       capturedChannel!.port1.dispatchMessage(validMsg);
       expect(handler).toHaveBeenCalledTimes(1);
-      expect(handler).toHaveBeenCalledWith(validMsg, expect.objectContaining({ data: validMsg }));
+      expect(handler).toHaveBeenCalledWith(
+        validMsg,
+        expect.objectContaining({ data: validMsg }),
+      );
     });
 
-    test("multiple messages through established endpoint are all received", async () => {
+    test("multiple messages through established endpoint are all received", () => {
       const sw = createMockServiceWorker();
 
-      const promise = serviceWorkerEndpoint(sw as any, { timeout: 5000 });
-      await new Promise((r) => setTimeout(r, 10));
+      const endpoint = serviceWorkerEndpoint(sw as any, { timeout: 5000 });
 
       capturedChannel!.port1.dispatchMessage({ type: "fractal:ack" });
-
-      const endpoint = await Promise.race([
-        promise,
-        new Promise<never>((_, rej) => setTimeout(() => rej(new Error("test timeout")), 500)),
-      ]);
 
       const handler = vi.fn();
       endpoint.onMessage(handler);
@@ -440,9 +417,125 @@ describe("endpoint/service-worker", () => {
       capturedChannel!.port1.dispatchMessage(msg3);
 
       expect(handler).toHaveBeenCalledTimes(3);
-      expect(handler).toHaveBeenNthCalledWith(1, msg1, expect.objectContaining({ data: msg1 }));
-      expect(handler).toHaveBeenNthCalledWith(2, msg2, expect.objectContaining({ data: msg2 }));
-      expect(handler).toHaveBeenNthCalledWith(3, msg3, expect.objectContaining({ data: msg3 }));
+      expect(handler).toHaveBeenNthCalledWith(
+        1,
+        msg1,
+        expect.objectContaining({ data: msg1 }),
+      );
+      expect(handler).toHaveBeenNthCalledWith(
+        2,
+        msg2,
+        expect.objectContaining({ data: msg2 }),
+      );
+      expect(handler).toHaveBeenNthCalledWith(
+        3,
+        msg3,
+        expect.objectContaining({ data: msg3 }),
+      );
+    });
+
+    // --- Buffering tests ---
+
+    test("send() before ack buffers messages (port.postMessage is not called)", () => {
+      const sw = createMockServiceWorker();
+      const endpoint = serviceWorkerEndpoint(sw as any);
+
+      endpoint.send({ jsonrpc: "2.0", method: "ping", id: 1 });
+      // port.postMessage should not have been called (only sw.postMessage for handshake)
+      expect(capturedChannel!.port1.postMessage).not.toHaveBeenCalled();
+    });
+
+    test("multiple send() calls before ack are all buffered", () => {
+      const sw = createMockServiceWorker();
+      const endpoint = serviceWorkerEndpoint(sw as any);
+
+      endpoint.send({ jsonrpc: "2.0", method: "a", id: 1 });
+      endpoint.send({ jsonrpc: "2.0", method: "b", id: 2 });
+      endpoint.send({ jsonrpc: "2.0", method: "c", id: 3 });
+      expect(capturedChannel!.port1.postMessage).not.toHaveBeenCalled();
+    });
+
+    test("onMessage() before ack holds handler and returns valid unsubscribe", () => {
+      const sw = createMockServiceWorker();
+      const endpoint = serviceWorkerEndpoint(sw as any);
+
+      const handler = vi.fn();
+      const unsub = endpoint.onMessage(handler);
+      expect(typeof unsub).toBe("function");
+    });
+
+    test("buffered send() messages are flushed in order after ack", () => {
+      const sw = createMockServiceWorker();
+      const endpoint = serviceWorkerEndpoint(sw as any);
+
+      const msg1 = { jsonrpc: "2.0", method: "a", id: 1 };
+      const msg2 = { jsonrpc: "2.0", method: "b", id: 2 };
+      const msg3 = { jsonrpc: "2.0", method: "c", id: 3 };
+      endpoint.send(msg1);
+      endpoint.send(msg2);
+      endpoint.send(msg3);
+
+      // Ack
+      capturedChannel!.port1.dispatchMessage({ type: "fractal:ack" });
+
+      expect(capturedChannel!.port1.postMessage).toHaveBeenCalledTimes(3);
+      expect(capturedChannel!.port1.postMessage).toHaveBeenNthCalledWith(
+        1,
+        msg1,
+      );
+      expect(capturedChannel!.port1.postMessage).toHaveBeenNthCalledWith(
+        2,
+        msg2,
+      );
+      expect(capturedChannel!.port1.postMessage).toHaveBeenNthCalledWith(
+        3,
+        msg3,
+      );
+    });
+
+    test("onMessage handler registered before ack receives messages after ack", () => {
+      const sw = createMockServiceWorker();
+      const endpoint = serviceWorkerEndpoint(sw as any);
+
+      const handler = vi.fn();
+      endpoint.onMessage(handler);
+
+      // Ack
+      capturedChannel!.port1.dispatchMessage({ type: "fractal:ack" });
+
+      // Now send a message through the port
+      const msg = { jsonrpc: "2.0", method: "ping", id: 1 };
+      capturedChannel!.port1.dispatchMessage(msg);
+      expect(handler).toHaveBeenCalledWith(
+        msg,
+        expect.objectContaining({ data: msg }),
+      );
+    });
+
+    test("handler unsubscribed before ack is not connected after ack", () => {
+      const sw = createMockServiceWorker();
+      const endpoint = serviceWorkerEndpoint(sw as any);
+
+      const handler = vi.fn();
+      const unsub = endpoint.onMessage(handler);
+      unsub();
+
+      // Ack
+      capturedChannel!.port1.dispatchMessage({ type: "fractal:ack" });
+
+      // Message should not reach the unsubscribed handler
+      const msg = { jsonrpc: "2.0", method: "ping", id: 1 };
+      capturedChannel!.port1.dispatchMessage(msg);
+      expect(handler).not.toHaveBeenCalled();
+    });
+
+    test("postMessage failure after handshake error causes send() to throw TIMEOUT", () => {
+      const sw = createMockServiceWorker();
+      sw.postMessage.mockImplementation(() => {
+        throw new DOMException("port closed");
+      });
+
+      expect(() => serviceWorkerEndpoint(sw as any)).toThrow("port closed");
     });
   });
 
@@ -480,7 +573,10 @@ describe("endpoint/service-worker", () => {
 
     test("onConnect registers a 'message' event listener on the global scope", () => {
       onConnect(vi.fn());
-      expect(mockScope.addEventListener).toHaveBeenCalledWith("message", expect.any(Function));
+      expect(mockScope.addEventListener).toHaveBeenCalledWith(
+        "message",
+        expect.any(Function),
+      );
     });
 
     test("callback receives an Endpoint when handshake message arrives", () => {
@@ -535,7 +631,10 @@ describe("endpoint/service-worker", () => {
 
       const msg = { jsonrpc: "2.0", method: "ping", id: 1 };
       port.dispatchMessage(msg);
-      expect(handler).toHaveBeenCalledWith(msg, expect.objectContaining({ data: msg }));
+      expect(handler).toHaveBeenCalledWith(
+        msg,
+        expect.objectContaining({ data: msg }),
+      );
     });
 
     test("multiple connections trigger callback multiple times", () => {
@@ -810,13 +909,18 @@ describe("endpoint/service-worker", () => {
       const validMsg = { jsonrpc: "2.0", method: "ping", id: 1 };
       port.dispatchMessage(validMsg);
       expect(handler).toHaveBeenCalledTimes(1);
-      expect(handler).toHaveBeenCalledWith(validMsg, expect.objectContaining({ data: validMsg }));
+      expect(handler).toHaveBeenCalledWith(
+        validMsg,
+        expect.objectContaining({ data: validMsg }),
+      );
     });
   });
 
   describe("onMessage unsubscribe and multiple handlers", () => {
     let originalMessageChannel: typeof MessageChannel;
-    let capturedChannel: { port1: MockMessagePort; port2: MockMessagePort } | undefined;
+    let capturedChannel:
+      | { port1: MockMessagePort; port2: MockMessagePort }
+      | undefined;
 
     beforeEach(() => {
       capturedChannel = undefined;
@@ -836,18 +940,12 @@ describe("endpoint/service-worker", () => {
       globalThis.MessageChannel = originalMessageChannel;
     });
 
-    test("onMessage の戻り値が解除関数であること（クライアント側）", async () => {
+    test("onMessage の戻り値が解除関数であること（クライアント側）", () => {
       const sw = createMockServiceWorker();
 
-      const promise = serviceWorkerEndpoint(sw as any, { timeout: 5000 });
-      await new Promise((r) => setTimeout(r, 10));
+      const endpoint = serviceWorkerEndpoint(sw as any, { timeout: 5000 });
 
       capturedChannel!.port1.dispatchMessage({ type: "fractal:ack" });
-
-      const endpoint = await Promise.race([
-        promise,
-        new Promise<never>((_, rej) => setTimeout(() => rej(new Error("test timeout")), 500)),
-      ]);
 
       const handler = vi.fn();
       const unsubscribe = endpoint.onMessage(handler);
@@ -902,18 +1000,12 @@ describe("endpoint/service-worker", () => {
       }
     });
 
-    test("onMessage を複数回呼び出すとハンドラが追加登録される（クライアント側）", async () => {
+    test("onMessage を複数回呼び出すとハンドラが追加登録される（クライアント側）", () => {
       const sw = createMockServiceWorker();
 
-      const promise = serviceWorkerEndpoint(sw as any, { timeout: 5000 });
-      await new Promise((r) => setTimeout(r, 10));
+      const endpoint = serviceWorkerEndpoint(sw as any, { timeout: 5000 });
 
       capturedChannel!.port1.dispatchMessage({ type: "fractal:ack" });
-
-      const endpoint = await Promise.race([
-        promise,
-        new Promise<never>((_, rej) => setTimeout(() => rej(new Error("test timeout")), 500)),
-      ]);
 
       const handler1 = vi.fn();
       const handler2 = vi.fn();
@@ -924,9 +1016,15 @@ describe("endpoint/service-worker", () => {
       capturedChannel!.port1.dispatchMessage(msg);
 
       expect(handler1).toHaveBeenCalledTimes(1);
-      expect(handler1).toHaveBeenCalledWith(msg, expect.objectContaining({ data: msg }));
+      expect(handler1).toHaveBeenCalledWith(
+        msg,
+        expect.objectContaining({ data: msg }),
+      );
       expect(handler2).toHaveBeenCalledTimes(1);
-      expect(handler2).toHaveBeenCalledWith(msg, expect.objectContaining({ data: msg }));
+      expect(handler2).toHaveBeenCalledWith(
+        msg,
+        expect.objectContaining({ data: msg }),
+      );
     });
 
     test("onMessage を複数回呼び出すとハンドラが追加登録される（SW側）", () => {
@@ -953,9 +1051,15 @@ describe("endpoint/service-worker", () => {
         port.dispatchMessage(msg);
 
         expect(handler1).toHaveBeenCalledTimes(1);
-        expect(handler1).toHaveBeenCalledWith(msg, expect.objectContaining({ data: msg }));
+        expect(handler1).toHaveBeenCalledWith(
+          msg,
+          expect.objectContaining({ data: msg }),
+        );
         expect(handler2).toHaveBeenCalledTimes(1);
-        expect(handler2).toHaveBeenCalledWith(msg, expect.objectContaining({ data: msg }));
+        expect(handler2).toHaveBeenCalledWith(
+          msg,
+          expect.objectContaining({ data: msg }),
+        );
       } finally {
         globalThis.addEventListener = originalAdd;
         globalThis.removeEventListener = originalRemove;
@@ -966,21 +1070,14 @@ describe("endpoint/service-worker", () => {
       const sw = createMockServiceWorker();
 
       // Use a timeout that is long enough that we can ack before it fires
-      const promise = serviceWorkerEndpoint(sw as any, { timeout: 200 });
-      await new Promise((r) => setTimeout(r, 10));
+      const endpoint = serviceWorkerEndpoint(sw as any, { timeout: 200 });
 
       // Ack immediately to clear the timeout
       capturedChannel!.port1.dispatchMessage({ type: "fractal:ack" });
 
-      const endpoint = await Promise.race([
-        promise,
-        new Promise<never>((_, rej) => setTimeout(() => rej(new Error("test timeout")), 500)),
-      ]);
       expect(endpoint).toBeDefined();
 
       // Wait longer than the original timeout to confirm it does not fire
-      // If the timer was not cleared, the promise would have been rejected with TIMEOUT,
-      // but since we already resolved it, we verify no uncaught errors occur.
       await new Promise((r) => setTimeout(r, 300));
 
       // The endpoint should still be functional after the original timeout period
@@ -989,7 +1086,10 @@ describe("endpoint/service-worker", () => {
       const msg = { jsonrpc: "2.0", method: "ping", id: 1 };
       capturedChannel!.port1.dispatchMessage(msg);
       expect(handler).toHaveBeenCalledTimes(1);
-      expect(handler).toHaveBeenCalledWith(msg, expect.objectContaining({ data: msg }));
+      expect(handler).toHaveBeenCalledWith(
+        msg,
+        expect.objectContaining({ data: msg }),
+      );
     });
 
     test("SW側での複数メッセージ連続受信", () => {
@@ -1024,11 +1124,31 @@ describe("endpoint/service-worker", () => {
         port.dispatchMessage(msg5);
 
         expect(handler).toHaveBeenCalledTimes(5);
-        expect(handler).toHaveBeenNthCalledWith(1, msg1, expect.objectContaining({ data: msg1 }));
-        expect(handler).toHaveBeenNthCalledWith(2, msg2, expect.objectContaining({ data: msg2 }));
-        expect(handler).toHaveBeenNthCalledWith(3, msg3, expect.objectContaining({ data: msg3 }));
-        expect(handler).toHaveBeenNthCalledWith(4, msg4, expect.objectContaining({ data: msg4 }));
-        expect(handler).toHaveBeenNthCalledWith(5, msg5, expect.objectContaining({ data: msg5 }));
+        expect(handler).toHaveBeenNthCalledWith(
+          1,
+          msg1,
+          expect.objectContaining({ data: msg1 }),
+        );
+        expect(handler).toHaveBeenNthCalledWith(
+          2,
+          msg2,
+          expect.objectContaining({ data: msg2 }),
+        );
+        expect(handler).toHaveBeenNthCalledWith(
+          3,
+          msg3,
+          expect.objectContaining({ data: msg3 }),
+        );
+        expect(handler).toHaveBeenNthCalledWith(
+          4,
+          msg4,
+          expect.objectContaining({ data: msg4 }),
+        );
+        expect(handler).toHaveBeenNthCalledWith(
+          5,
+          msg5,
+          expect.objectContaining({ data: msg5 }),
+        );
       } finally {
         globalThis.addEventListener = originalAdd;
         globalThis.removeEventListener = originalRemove;
@@ -1038,7 +1158,9 @@ describe("endpoint/service-worker", () => {
 
   describe("serviceWorkerEndpoint - timeout cleanup", () => {
     let originalMessageChannel: typeof MessageChannel;
-    let capturedChannel: { port1: MockMessagePort; port2: MockMessagePort } | undefined;
+    let capturedChannel:
+      | { port1: MockMessagePort; port2: MockMessagePort }
+      | undefined;
 
     beforeEach(() => {
       capturedChannel = undefined;
@@ -1058,50 +1180,55 @@ describe("endpoint/service-worker", () => {
       globalThis.MessageChannel = originalMessageChannel;
     });
 
-    test("late ack after timeout is ignored and does not resolve the promise", async () => {
+    test("late ack after timeout is ignored", async () => {
       const sw = createMockServiceWorker();
 
       // Use a short timeout so it fires quickly
-      const promise = serviceWorkerEndpoint(sw as any, { timeout: 50 });
-      await new Promise((r) => setTimeout(r, 10));
+      const endpoint = serviceWorkerEndpoint(sw as any, { timeout: 50 });
       expect(capturedChannel).toBeDefined();
 
-      // Wait for timeout to fire and reject
-      await expect(promise).rejects.toMatchObject({ code: "TIMEOUT" });
+      // Wait for timeout to fire
+      await new Promise((r) => setTimeout(r, 60));
 
-      // Now simulate a late ack arriving after the timeout has already rejected
+      // Verify timed out
+      expect(() => endpoint.send({})).toThrow(FractalError);
+
+      // Now simulate a late ack arriving after the timeout
       // This should not throw or cause any issues
       expect(() => {
         capturedChannel!.port1.dispatchMessage({ type: "fractal:ack" });
       }).not.toThrow();
+
+      // send() should still throw TIMEOUT even after late ack
+      expect(() => endpoint.send({})).toThrow(FractalError);
     });
 
     test("ack handler is removed from port after timeout fires", async () => {
       const sw = createMockServiceWorker();
 
-      const promise = serviceWorkerEndpoint(sw as any, { timeout: 50 });
-      await new Promise((r) => setTimeout(r, 10));
+      const endpoint = serviceWorkerEndpoint(sw as any, { timeout: 50 });
       expect(capturedChannel).toBeDefined();
 
       // Count listeners before timeout
       const listenersBefore = capturedChannel!.port1._listeners.length;
       expect(listenersBefore).toBeGreaterThanOrEqual(1);
 
-      // Wait for timeout to reject
-      await expect(promise).rejects.toMatchObject({ code: "TIMEOUT" });
+      // Wait for timeout to fire
+      await new Promise((r) => setTimeout(r, 60));
 
-      // After timeout, a late ack should not create a new endpoint or call resolve
-      // We verify the ack listener was cleaned up by checking that late ack does nothing
+      // After timeout, a late ack should not create a new endpoint
       capturedChannel!.port1.dispatchMessage({ type: "fractal:ack" });
 
-      // The promise was already rejected, so the late ack is effectively a no-op
-      // (Promise can only be settled once)
+      // send() should still throw TIMEOUT
+      expect(() => endpoint.send({})).toThrow(FractalError);
     });
   });
 
   describe("additional coverage", () => {
     let originalMessageChannel: typeof MessageChannel;
-    let capturedChannel: { port1: MockMessagePort; port2: MockMessagePort } | undefined;
+    let capturedChannel:
+      | { port1: MockMessagePort; port2: MockMessagePort }
+      | undefined;
 
     beforeEach(() => {
       capturedChannel = undefined;
@@ -1123,53 +1250,48 @@ describe("endpoint/service-worker", () => {
 
     test("postMessage失敗時のタイムアウトタイマークリア: タイムアウト後にTIMEOUTエラーが追加で発生しないこと", async () => {
       const sw = createMockServiceWorker();
-      const postMessageError = new DOMException("Failed to execute 'postMessage'");
+      const postMessageError = new DOMException(
+        "Failed to execute 'postMessage'",
+      );
       sw.postMessage.mockImplementation(() => {
         throw postMessageError;
       });
 
-      // Use a timeout so a timer is started before postMessage throws
-      const promise = serviceWorkerEndpoint(sw as any, { timeout: 200 });
-
-      // The promise should reject with the postMessage error (not TIMEOUT)
-      await expect(promise).rejects.toThrow("Failed to execute 'postMessage'");
+      // postMessage failure throws synchronously
+      expect(() => serviceWorkerEndpoint(sw as any, { timeout: 200 })).toThrow(
+        "Failed to execute 'postMessage'",
+      );
 
       // Wait longer than the timeout duration to confirm the timer was cleared
-      // and no additional TIMEOUT rejection is fired
       await new Promise((r) => setTimeout(r, 400));
 
-      // If clearTimeout was not called, the timeout callback would fire and
-      // attempt to reject an already-settled promise. While that wouldn't throw,
-      // we verify correctness by confirming the rejection reason was the
-      // postMessage error, not a TIMEOUT FractalError.
+      // Subsequent call should also throw the postMessage error
       let caughtError: unknown;
       try {
-        await serviceWorkerEndpoint(sw as any, { timeout: 200 });
+        serviceWorkerEndpoint(sw as any, { timeout: 200 });
       } catch (e) {
         caughtError = e;
       }
       expect(caughtError).toBeInstanceOf(DOMException);
-      expect((caughtError as DOMException).message).toBe("Failed to execute 'postMessage'");
+      expect((caughtError as DOMException).message).toBe(
+        "Failed to execute 'postMessage'",
+      );
     });
 
-    test("ack受信後にportのremoveEventListenerが呼ばれること", async () => {
+    test("ack受信後にportのremoveEventListenerが呼ばれること", () => {
       const sw = createMockServiceWorker();
 
-      const promise = serviceWorkerEndpoint(sw as any, { timeout: 5000 });
-      await new Promise((r) => setTimeout(r, 10));
+      const endpoint = serviceWorkerEndpoint(sw as any, { timeout: 5000 });
 
       expect(capturedChannel).toBeDefined();
 
       // Before ack, removeEventListener should not have been called for the ack handler
-      const removeCallsBefore = capturedChannel!.port1.removeEventListener.mock.calls.length;
+      const removeCallsBefore =
+        capturedChannel!.port1.removeEventListener.mock.calls.length;
 
       // Simulate ack
       capturedChannel!.port1.dispatchMessage({ type: "fractal:ack" });
 
-      const endpoint = await Promise.race([
-        promise,
-        new Promise<never>((_, rej) => setTimeout(() => rej(new Error("test timeout")), 500)),
-      ]);
       expect(endpoint).toBeDefined();
 
       // After ack, removeEventListener should have been called on the port
@@ -1178,23 +1300,25 @@ describe("endpoint/service-worker", () => {
         "message",
         expect.any(Function),
       );
-      expect(capturedChannel!.port1.removeEventListener.mock.calls.length).toBeGreaterThan(
-        removeCallsBefore,
-      );
+      expect(
+        capturedChannel!.port1.removeEventListener.mock.calls.length,
+      ).toBeGreaterThan(removeCallsBefore);
     });
 
-    test("ハンドシェイクメッセージのtype値が正確に 'fractal:connect' であること", async () => {
+    test("ハンドシェイクメッセージのtype値が正確に 'fractal:connect' であること", () => {
       const sw = createMockServiceWorker();
-      const promise = serviceWorkerEndpoint(sw as any, { timeout: 100 }).catch(() => {});
-      await new Promise((r) => setTimeout(r, 10));
+      serviceWorkerEndpoint(sw as any, { timeout: 100 });
 
       expect(sw.postMessage).toHaveBeenCalled();
-      const handshakeMsg = sw.postMessage.mock.calls[0]?.[0] as Record<string, unknown>;
+      const handshakeMsg = sw.postMessage.mock.calls[0]?.[0] as Record<
+        string,
+        unknown
+      >;
       // Exact match: not just "fractal:" prefix, but the full string "fractal:connect"
       expect(handshakeMsg?.type).toBe("fractal:connect");
     });
 
-    test("JSON-RPC round-trip after handshake: client sends request, SW-side receives and responds", async () => {
+    test("JSON-RPC round-trip after handshake: client sends request, SW-side receives and responds", () => {
       // --- Set up SW-side (onConnect) ---
       const mockScope = createMockServiceWorkerGlobalScope();
       const originalAdd = globalThis.addEventListener;
@@ -1215,25 +1339,15 @@ describe("endpoint/service-worker", () => {
         mockScope.dispatchMessage(msg, transfer as any);
       });
 
-      const promise = serviceWorkerEndpoint(sw as any, { timeout: 5000 });
-      await new Promise((r) => setTimeout(r, 10));
+      const clientEndpoint = serviceWorkerEndpoint(sw as any, {
+        timeout: 5000,
+      });
 
       // After postMessage, the onConnect callback should have fired and sent ack
-      // The ack was sent through the port via port.postMessage({ type: "fractal:ack" })
-      // We need to relay the ack back to the client-side port
       expect(swEndpoint).toBeDefined();
 
-      // The onConnect side sent ack through port.postMessage, which is the
-      // mock port from dispatchMessage. We need to get the ack to the client side.
-      // In the real world, the transferred port IS port1 (client side).
-      // In our mock, postMessage on the SW-side port triggers nothing on the client port.
-      // So we manually dispatch the ack on port1 (the client-side listening port).
+      // Manually dispatch the ack on port1 (the client-side listening port).
       capturedChannel!.port1.dispatchMessage({ type: "fractal:ack" });
-
-      const clientEndpoint = await Promise.race([
-        promise,
-        new Promise<never>((_, rej) => setTimeout(() => rej(new Error("test timeout")), 500)),
-      ]);
 
       // --- Register handler on SW-side endpoint ---
       const swHandler = vi.fn();
@@ -1248,23 +1362,19 @@ describe("endpoint/service-worker", () => {
       clientEndpoint.send(request);
 
       // The send goes through port.postMessage on the client's port.
-      // In real transport, this would arrive at the SW-side port.
-      // We simulate the SW-side port receiving it by finding what was posted.
       expect(capturedChannel!.port1.postMessage).toHaveBeenCalledWith(request);
 
       // --- SW-side endpoint receives and responds ---
-      // Simulate the SW-side port receiving the JSON-RPC request
-      // (In the mock, we need to get the ports associated with the onConnect endpoint)
-      // The onConnect callback received an endpoint wrapping the port from mockScope.dispatchMessage.
-      // That port is the first MockMessagePort passed to dispatchMessage.
-      // We need to find that port. It was passed as ports[0] in the mockScope.dispatchMessage call.
-      // Let's get the port from the SW postMessage mock.
-      const swPort = sw.postMessage.mock.calls[0]?.[1]?.[0] as MockMessagePort | undefined;
+      const swPort = sw.postMessage.mock.calls[0]?.[1]?.[0] as
+        | MockMessagePort
+        | undefined;
       if (swPort && "dispatchMessage" in swPort) {
-        // Dispatch the request to the SW-side endpoint's onMessage handler
         swPort.dispatchMessage(request);
       }
-      expect(swHandler).toHaveBeenCalledWith(request, expect.objectContaining({ data: request }));
+      expect(swHandler).toHaveBeenCalledWith(
+        request,
+        expect.objectContaining({ data: request }),
+      );
 
       // SW responds
       const response = { jsonrpc: "2.0", result: "pong", id: 1 };
@@ -1272,7 +1382,10 @@ describe("endpoint/service-worker", () => {
 
       // Simulate client-side port receiving the response
       capturedChannel!.port1.dispatchMessage(response);
-      expect(clientHandler).toHaveBeenCalledWith(response, expect.objectContaining({ data: response }));
+      expect(clientHandler).toHaveBeenCalledWith(
+        response,
+        expect.objectContaining({ data: response }),
+      );
 
       // Restore
       globalThis.addEventListener = originalAdd;
@@ -1352,9 +1465,18 @@ describe("endpoint/service-worker", () => {
         expect(handler3).toHaveBeenCalledTimes(1);
 
         // Each receives the same message
-        expect(handler1).toHaveBeenCalledWith(msg, expect.objectContaining({ data: msg }));
-        expect(handler2).toHaveBeenCalledWith(msg, expect.objectContaining({ data: msg }));
-        expect(handler3).toHaveBeenCalledWith(msg, expect.objectContaining({ data: msg }));
+        expect(handler1).toHaveBeenCalledWith(
+          msg,
+          expect.objectContaining({ data: msg }),
+        );
+        expect(handler2).toHaveBeenCalledWith(
+          msg,
+          expect.objectContaining({ data: msg }),
+        );
+        expect(handler3).toHaveBeenCalledWith(
+          msg,
+          expect.objectContaining({ data: msg }),
+        );
       } finally {
         globalThis.addEventListener = originalAdd;
         globalThis.removeEventListener = originalRemove;
@@ -1378,14 +1500,18 @@ describe("endpoint/service-worker", () => {
 
         // removeEventListener should not have been called yet
         // (no previous listener to remove on the first call)
-        const removeCallsBefore = mockScope.removeEventListener.mock.calls.length;
+        const removeCallsBefore =
+          mockScope.removeEventListener.mock.calls.length;
 
         // Call onConnect again with a new callback
         const cb2 = vi.fn();
         onConnect(cb2);
 
         // removeEventListener should have been called to remove the first listener
-        expect(mockScope.removeEventListener).toHaveBeenCalledWith("message", firstListener);
+        expect(mockScope.removeEventListener).toHaveBeenCalledWith(
+          "message",
+          firstListener,
+        );
         expect(mockScope.removeEventListener.mock.calls.length).toBeGreaterThan(
           removeCallsBefore,
         );
@@ -1420,16 +1546,17 @@ describe("endpoint/service-worker", () => {
 
     test("timeout: 1 (minimum valid positive integer) eventually times out with TIMEOUT", async () => {
       const sw = createMockServiceWorker();
-      // timeout: 1 is a valid positive number; should fire TIMEOUT after ~1ms
-      await expect(
-        serviceWorkerEndpoint(sw as any, { timeout: 1 }),
-      ).rejects.toMatchObject({ code: "TIMEOUT" });
+      const endpoint = serviceWorkerEndpoint(sw as any, { timeout: 1 });
+      await new Promise((r) => setTimeout(r, 20));
+      expect(() => endpoint.send({})).toThrow(FractalError);
     });
 
-    test("timeout: 1 rejects with a FractalError instance", async () => {
+    test("timeout: 1 send() throws FractalError with TIMEOUT code", async () => {
       const sw = createMockServiceWorker();
+      const endpoint = serviceWorkerEndpoint(sw as any, { timeout: 1 });
+      await new Promise((r) => setTimeout(r, 20));
       try {
-        await serviceWorkerEndpoint(sw as any, { timeout: 1 });
+        endpoint.send({});
         expect.unreachable("should have thrown");
       } catch (err) {
         expect(err).toBeInstanceOf(FractalError);
@@ -1442,28 +1569,27 @@ describe("endpoint/service-worker", () => {
       // Number.MAX_SAFE_INTEGER is a valid non-negative number, so it should not throw
       // TypeError. It will overflow setTimeout's 32-bit limit and fire quickly, but the
       // important thing is it's treated as a valid timeout value (not rejected as invalid).
-      try {
-        await serviceWorkerEndpoint(sw as any, { timeout: Number.MAX_SAFE_INTEGER });
-        // If it resolves (unlikely without ack), that's fine too
-      } catch (err) {
-        // Should be TIMEOUT (from setTimeout overflow), NOT a TypeError
-        expect(err).toBeInstanceOf(FractalError);
-        expect((err as FractalError).code).toBe("TIMEOUT");
-      }
+      expect(() =>
+        serviceWorkerEndpoint(sw as any, { timeout: Number.MAX_SAFE_INTEGER }),
+      ).not.toThrow(TypeError);
+      // After overflow fires, send() should throw TIMEOUT
+      await new Promise((r) => setTimeout(r, 20));
     });
 
     test("timeout: -0 is treated the same as timeout: 0 (immediate TIMEOUT)", async () => {
       const sw = createMockServiceWorker();
       // -0 === 0 in JavaScript; should be immediate timeout
-      await expect(
-        serviceWorkerEndpoint(sw as any, { timeout: -0 }),
-      ).rejects.toMatchObject({ code: "TIMEOUT" });
+      const endpoint = serviceWorkerEndpoint(sw as any, { timeout: -0 });
+      await new Promise((r) => setTimeout(r, 10));
+      expect(() => endpoint.send({})).toThrow(FractalError);
     });
 
-    test("timeout: -0 rejects with FractalError instance", async () => {
+    test("timeout: -0 send() throws FractalError instance", async () => {
       const sw = createMockServiceWorker();
+      const endpoint = serviceWorkerEndpoint(sw as any, { timeout: -0 });
+      await new Promise((r) => setTimeout(r, 10));
       try {
-        await serviceWorkerEndpoint(sw as any, { timeout: -0 });
+        endpoint.send({});
         expect.unreachable("should have thrown");
       } catch (err) {
         expect(err).toBeInstanceOf(FractalError);
@@ -1553,7 +1679,9 @@ describe("endpoint/service-worker", () => {
 
   describe("selective unsubscribe of middle handler among 3+ handlers", () => {
     let originalMessageChannel: typeof MessageChannel;
-    let capturedChannel: { port1: MockMessagePort; port2: MockMessagePort } | undefined;
+    let capturedChannel:
+      | { port1: MockMessagePort; port2: MockMessagePort }
+      | undefined;
 
     beforeEach(() => {
       capturedChannel = undefined;
@@ -1573,18 +1701,12 @@ describe("endpoint/service-worker", () => {
       globalThis.MessageChannel = originalMessageChannel;
     });
 
-    test("unsubscribing the middle handler leaves first and last handlers active (client-side)", async () => {
+    test("unsubscribing the middle handler leaves first and last handlers active (client-side)", () => {
       const sw = createMockServiceWorker();
 
-      const promise = serviceWorkerEndpoint(sw as any, { timeout: 5000 });
-      await new Promise((r) => setTimeout(r, 10));
+      const endpoint = serviceWorkerEndpoint(sw as any, { timeout: 5000 });
 
       capturedChannel!.port1.dispatchMessage({ type: "fractal:ack" });
-
-      const endpoint = await Promise.race([
-        promise,
-        new Promise<never>((_, rej) => setTimeout(() => rej(new Error("test timeout")), 500)),
-      ]);
 
       const handler1 = vi.fn();
       const handler2 = vi.fn();
@@ -1673,7 +1795,9 @@ describe("endpoint/service-worker", () => {
 
   describe("JSON-RPC Response message passthrough", () => {
     let originalMessageChannel: typeof MessageChannel;
-    let capturedChannel: { port1: MockMessagePort; port2: MockMessagePort } | undefined;
+    let capturedChannel:
+      | { port1: MockMessagePort; port2: MockMessagePort }
+      | undefined;
 
     beforeEach(() => {
       capturedChannel = undefined;
@@ -1693,18 +1817,12 @@ describe("endpoint/service-worker", () => {
       globalThis.MessageChannel = originalMessageChannel;
     });
 
-    test("endpoint passes JSON-RPC success response (with result field) to handler (client-side)", async () => {
+    test("endpoint passes JSON-RPC success response (with result field) to handler (client-side)", () => {
       const sw = createMockServiceWorker();
 
-      const promise = serviceWorkerEndpoint(sw as any, { timeout: 5000 });
-      await new Promise((r) => setTimeout(r, 10));
+      const endpoint = serviceWorkerEndpoint(sw as any, { timeout: 5000 });
 
       capturedChannel!.port1.dispatchMessage({ type: "fractal:ack" });
-
-      const endpoint = await Promise.race([
-        promise,
-        new Promise<never>((_, rej) => setTimeout(() => rej(new Error("test timeout")), 500)),
-      ]);
 
       const handler = vi.fn();
       endpoint.onMessage(handler);
@@ -1714,31 +1832,35 @@ describe("endpoint/service-worker", () => {
       capturedChannel!.port1.dispatchMessage(responseMsg);
 
       expect(handler).toHaveBeenCalledTimes(1);
-      expect(handler).toHaveBeenCalledWith(responseMsg, expect.objectContaining({ data: responseMsg }));
+      expect(handler).toHaveBeenCalledWith(
+        responseMsg,
+        expect.objectContaining({ data: responseMsg }),
+      );
     });
 
-    test("endpoint passes JSON-RPC error response (with error field) to handler (client-side)", async () => {
+    test("endpoint passes JSON-RPC error response (with error field) to handler (client-side)", () => {
       const sw = createMockServiceWorker();
 
-      const promise = serviceWorkerEndpoint(sw as any, { timeout: 5000 });
-      await new Promise((r) => setTimeout(r, 10));
+      const endpoint = serviceWorkerEndpoint(sw as any, { timeout: 5000 });
 
       capturedChannel!.port1.dispatchMessage({ type: "fractal:ack" });
-
-      const endpoint = await Promise.race([
-        promise,
-        new Promise<never>((_, rej) => setTimeout(() => rej(new Error("test timeout")), 500)),
-      ]);
 
       const handler = vi.fn();
       endpoint.onMessage(handler);
 
       // JSON-RPC error response message
-      const errorResponseMsg = { jsonrpc: "2.0", error: { code: -32601, message: "Method not found" }, id: 2 };
+      const errorResponseMsg = {
+        jsonrpc: "2.0",
+        error: { code: -32601, message: "Method not found" },
+        id: 2,
+      };
       capturedChannel!.port1.dispatchMessage(errorResponseMsg);
 
       expect(handler).toHaveBeenCalledTimes(1);
-      expect(handler).toHaveBeenCalledWith(errorResponseMsg, expect.objectContaining({ data: errorResponseMsg }));
+      expect(handler).toHaveBeenCalledWith(
+        errorResponseMsg,
+        expect.objectContaining({ data: errorResponseMsg }),
+      );
     });
 
     test("endpoint passes JSON-RPC response messages to handler (SW-side)", () => {
@@ -1763,31 +1885,35 @@ describe("endpoint/service-worker", () => {
         const successResponse = { jsonrpc: "2.0", result: "pong", id: 1 };
         port.dispatchMessage(successResponse);
         expect(handler).toHaveBeenCalledTimes(1);
-        expect(handler).toHaveBeenCalledWith(successResponse, expect.objectContaining({ data: successResponse }));
+        expect(handler).toHaveBeenCalledWith(
+          successResponse,
+          expect.objectContaining({ data: successResponse }),
+        );
 
         // JSON-RPC error response
-        const errorResponse = { jsonrpc: "2.0", error: { code: -32603, message: "Internal error" }, id: 2 };
+        const errorResponse = {
+          jsonrpc: "2.0",
+          error: { code: -32603, message: "Internal error" },
+          id: 2,
+        };
         port.dispatchMessage(errorResponse);
         expect(handler).toHaveBeenCalledTimes(2);
-        expect(handler).toHaveBeenCalledWith(errorResponse, expect.objectContaining({ data: errorResponse }));
+        expect(handler).toHaveBeenCalledWith(
+          errorResponse,
+          expect.objectContaining({ data: errorResponse }),
+        );
       } finally {
         globalThis.addEventListener = originalAdd;
         globalThis.removeEventListener = originalRemove;
       }
     });
 
-    test("endpoint passes both request and response messages through to handler", async () => {
+    test("endpoint passes both request and response messages through to handler", () => {
       const sw = createMockServiceWorker();
 
-      const promise = serviceWorkerEndpoint(sw as any, { timeout: 5000 });
-      await new Promise((r) => setTimeout(r, 10));
+      const endpoint = serviceWorkerEndpoint(sw as any, { timeout: 5000 });
 
       capturedChannel!.port1.dispatchMessage({ type: "fractal:ack" });
-
-      const endpoint = await Promise.race([
-        promise,
-        new Promise<never>((_, rej) => setTimeout(() => rej(new Error("test timeout")), 500)),
-      ]);
 
       const handler = vi.fn();
       endpoint.onMessage(handler);
@@ -1795,22 +1921,40 @@ describe("endpoint/service-worker", () => {
       // Mix of request and response messages
       const request = { jsonrpc: "2.0", method: "ping", id: 1 };
       const successResponse = { jsonrpc: "2.0", result: "pong", id: 1 };
-      const errorResponse = { jsonrpc: "2.0", error: { code: -32601, message: "Not found" }, id: 2 };
+      const errorResponse = {
+        jsonrpc: "2.0",
+        error: { code: -32601, message: "Not found" },
+        id: 2,
+      };
 
       capturedChannel!.port1.dispatchMessage(request);
       capturedChannel!.port1.dispatchMessage(successResponse);
       capturedChannel!.port1.dispatchMessage(errorResponse);
 
       expect(handler).toHaveBeenCalledTimes(3);
-      expect(handler).toHaveBeenNthCalledWith(1, request, expect.objectContaining({ data: request }));
-      expect(handler).toHaveBeenNthCalledWith(2, successResponse, expect.objectContaining({ data: successResponse }));
-      expect(handler).toHaveBeenNthCalledWith(3, errorResponse, expect.objectContaining({ data: errorResponse }));
+      expect(handler).toHaveBeenNthCalledWith(
+        1,
+        request,
+        expect.objectContaining({ data: request }),
+      );
+      expect(handler).toHaveBeenNthCalledWith(
+        2,
+        successResponse,
+        expect.objectContaining({ data: successResponse }),
+      );
+      expect(handler).toHaveBeenNthCalledWith(
+        3,
+        errorResponse,
+        expect.objectContaining({ data: errorResponse }),
+      );
     });
   });
 
   describe("Endpoint interface shape", () => {
     let originalMessageChannel: typeof MessageChannel;
-    let capturedChannel: { port1: MockMessagePort; port2: MockMessagePort } | undefined;
+    let capturedChannel:
+      | { port1: MockMessagePort; port2: MockMessagePort }
+      | undefined;
 
     beforeEach(() => {
       capturedChannel = undefined;
@@ -1830,18 +1974,10 @@ describe("endpoint/service-worker", () => {
       globalThis.MessageChannel = originalMessageChannel;
     });
 
-    test("resolved endpoint from serviceWorkerEndpoint has send and onMessage properties", async () => {
+    test("endpoint from serviceWorkerEndpoint has send and onMessage properties", () => {
       const sw = createMockServiceWorker();
 
-      const promise = serviceWorkerEndpoint(sw as any, { timeout: 5000 });
-      await new Promise((r) => setTimeout(r, 10));
-
-      capturedChannel!.port1.dispatchMessage({ type: "fractal:ack" });
-
-      const endpoint = await Promise.race([
-        promise,
-        new Promise<never>((_, rej) => setTimeout(() => rej(new Error("test timeout")), 500)),
-      ]);
+      const endpoint = serviceWorkerEndpoint(sw as any, { timeout: 5000 });
 
       expect(endpoint).toHaveProperty("send");
       expect(endpoint).toHaveProperty("onMessage");
@@ -1849,18 +1985,10 @@ describe("endpoint/service-worker", () => {
       expect(typeof endpoint.onMessage).toBe("function");
     });
 
-    test("resolved endpoint has only send and onMessage as own properties (no extra properties)", async () => {
+    test("endpoint has only send and onMessage as own properties (no extra properties)", () => {
       const sw = createMockServiceWorker();
 
-      const promise = serviceWorkerEndpoint(sw as any, { timeout: 5000 });
-      await new Promise((r) => setTimeout(r, 10));
-
-      capturedChannel!.port1.dispatchMessage({ type: "fractal:ack" });
-
-      const endpoint = await Promise.race([
-        promise,
-        new Promise<never>((_, rej) => setTimeout(() => rej(new Error("test timeout")), 500)),
-      ]);
+      const endpoint = serviceWorkerEndpoint(sw as any, { timeout: 5000 });
 
       const keys = Object.keys(endpoint);
       expect(keys).toContain("send");
@@ -1951,7 +2079,10 @@ describe("endpoint/service-worker", () => {
         onConnect(cb2);
 
         // removeEventListener が "message" と前回のリスナー関数を引数に呼ばれたことを検証
-        expect(mockScope.removeEventListener).toHaveBeenCalledWith("message", firstListener);
+        expect(mockScope.removeEventListener).toHaveBeenCalledWith(
+          "message",
+          firstListener,
+        );
 
         // 2回目で登録された新しいリスナーは前回のものとは異なる
         expect(mockScope.addEventListener).toHaveBeenCalledTimes(2);
@@ -1968,7 +2099,9 @@ describe("endpoint/service-worker", () => {
 
     describe("onMessage の dispose 冪等性", () => {
       let originalMessageChannel: typeof MessageChannel;
-      let capturedChannel: { port1: MockMessagePort; port2: MockMessagePort } | undefined;
+      let capturedChannel:
+        | { port1: MockMessagePort; port2: MockMessagePort }
+        | undefined;
 
       beforeEach(() => {
         capturedChannel = undefined;
@@ -1988,18 +2121,12 @@ describe("endpoint/service-worker", () => {
         globalThis.MessageChannel = originalMessageChannel;
       });
 
-      test("endpoint.onMessage() の戻り値 dispose を複数回呼んでもエラーにならないこと（クライアント側）", async () => {
+      test("endpoint.onMessage() の戻り値 dispose を複数回呼んでもエラーにならないこと（クライアント側）", () => {
         const sw = createMockServiceWorker();
 
-        const promise = serviceWorkerEndpoint(sw as any, { timeout: 5000 });
-        await new Promise((r) => setTimeout(r, 10));
+        const endpoint = serviceWorkerEndpoint(sw as any, { timeout: 5000 });
 
         capturedChannel!.port1.dispatchMessage({ type: "fractal:ack" });
-
-        const endpoint = await Promise.race([
-          promise,
-          new Promise<never>((_, rej) => setTimeout(() => rej(new Error("test timeout")), 500)),
-        ]);
 
         const handler = vi.fn();
         const dispose = endpoint.onMessage(handler);
@@ -2061,7 +2188,9 @@ describe("endpoint/service-worker", () => {
 
     describe("同一ハンドラの複数回登録", () => {
       let originalMessageChannel: typeof MessageChannel;
-      let capturedChannel: { port1: MockMessagePort; port2: MockMessagePort } | undefined;
+      let capturedChannel:
+        | { port1: MockMessagePort; port2: MockMessagePort }
+        | undefined;
 
       beforeEach(() => {
         capturedChannel = undefined;
@@ -2081,18 +2210,12 @@ describe("endpoint/service-worker", () => {
         globalThis.MessageChannel = originalMessageChannel;
       });
 
-      test("同じ handler を endpoint.onMessage() で2回登録し、メッセージ受信時に2回呼ばれること（クライアント側）", async () => {
+      test("同じ handler を endpoint.onMessage() で2回登録し、メッセージ受信時に2回呼ばれること（クライアント側）", () => {
         const sw = createMockServiceWorker();
 
-        const promise = serviceWorkerEndpoint(sw as any, { timeout: 5000 });
-        await new Promise((r) => setTimeout(r, 10));
+        const endpoint = serviceWorkerEndpoint(sw as any, { timeout: 5000 });
 
         capturedChannel!.port1.dispatchMessage({ type: "fractal:ack" });
-
-        const endpoint = await Promise.race([
-          promise,
-          new Promise<never>((_, rej) => setTimeout(() => rej(new Error("test timeout")), 500)),
-        ]);
 
         // 同一の handler 関数を2回登録する
         const handler = vi.fn();
@@ -2105,8 +2228,16 @@ describe("endpoint/service-worker", () => {
 
         // handler が2回呼ばれること（addEventListener のセマンティクスと同じ追加登録）
         expect(handler).toHaveBeenCalledTimes(2);
-        expect(handler).toHaveBeenNthCalledWith(1, msg, expect.objectContaining({ data: msg }));
-        expect(handler).toHaveBeenNthCalledWith(2, msg, expect.objectContaining({ data: msg }));
+        expect(handler).toHaveBeenNthCalledWith(
+          1,
+          msg,
+          expect.objectContaining({ data: msg }),
+        );
+        expect(handler).toHaveBeenNthCalledWith(
+          2,
+          msg,
+          expect.objectContaining({ data: msg }),
+        );
       });
 
       test("同じ handler を endpoint.onMessage() で2回登録し、メッセージ受信時に2回呼ばれること（SW側）", () => {
@@ -2136,8 +2267,16 @@ describe("endpoint/service-worker", () => {
 
           // handler が2回呼ばれること（addEventListener のセマンティクスと同じ追加登録）
           expect(handler).toHaveBeenCalledTimes(2);
-          expect(handler).toHaveBeenNthCalledWith(1, msg, expect.objectContaining({ data: msg }));
-          expect(handler).toHaveBeenNthCalledWith(2, msg, expect.objectContaining({ data: msg }));
+          expect(handler).toHaveBeenNthCalledWith(
+            1,
+            msg,
+            expect.objectContaining({ data: msg }),
+          );
+          expect(handler).toHaveBeenNthCalledWith(
+            2,
+            msg,
+            expect.objectContaining({ data: msg }),
+          );
         } finally {
           globalThis.addEventListener = originalAdd;
           globalThis.removeEventListener = originalRemove;
@@ -2214,10 +2353,13 @@ describe("endpoint/service-worker", () => {
       globalThis.MessageChannel = originalMessageChannel;
     });
 
-    test("independent MessageChannels are created for each call to serviceWorkerEndpoint with the same controller", async () => {
+    test("independent MessageChannels are created for each call to serviceWorkerEndpoint with the same controller", () => {
       const sw = createMockServiceWorker();
 
-      const capturedChannels: { port1: MockMessagePort; port2: MockMessagePort }[] = [];
+      const capturedChannels: {
+        port1: MockMessagePort;
+        port2: MockMessagePort;
+      }[] = [];
       globalThis.MessageChannel = class MockMessageChannel {
         port1: MockMessagePort;
         port2: MockMessagePort;
@@ -2228,9 +2370,8 @@ describe("endpoint/service-worker", () => {
         }
       } as any;
 
-      const promise1 = serviceWorkerEndpoint(sw as any, { timeout: 5000 });
-      const promise2 = serviceWorkerEndpoint(sw as any, { timeout: 5000 });
-      await new Promise((r) => setTimeout(r, 10));
+      const endpoint1 = serviceWorkerEndpoint(sw as any, { timeout: 5000 });
+      const endpoint2 = serviceWorkerEndpoint(sw as any, { timeout: 5000 });
 
       // Two separate postMessage calls should have been made to the same controller
       expect(sw.postMessage).toHaveBeenCalledTimes(2);
@@ -2243,15 +2384,6 @@ describe("endpoint/service-worker", () => {
       capturedChannels[0].port1.dispatchMessage({ type: "fractal:ack" });
       capturedChannels[1].port1.dispatchMessage({ type: "fractal:ack" });
 
-      const endpoint1 = await Promise.race([
-        promise1,
-        new Promise<never>((_, rej) => setTimeout(() => rej(new Error("test timeout")), 500)),
-      ]);
-      const endpoint2 = await Promise.race([
-        promise2,
-        new Promise<never>((_, rej) => setTimeout(() => rej(new Error("test timeout")), 500)),
-      ]);
-
       // Endpoints should be distinct objects
       expect(endpoint1).not.toBe(endpoint2);
 
@@ -2262,15 +2394,21 @@ describe("endpoint/service-worker", () => {
       endpoint2.send(msg2);
 
       expect(capturedChannels[0].port1.postMessage).toHaveBeenCalledWith(msg1);
-      expect(capturedChannels[0].port1.postMessage).not.toHaveBeenCalledWith(msg2);
+      expect(capturedChannels[0].port1.postMessage).not.toHaveBeenCalledWith(
+        msg2,
+      );
       expect(capturedChannels[1].port1.postMessage).toHaveBeenCalledWith(msg2);
-      expect(capturedChannels[1].port1.postMessage).not.toHaveBeenCalledWith(msg1);
+      expect(capturedChannels[1].port1.postMessage).not.toHaveBeenCalledWith(
+        msg1,
+      );
     });
   });
 
   describe("send() message passthrough integrity", () => {
     let originalMessageChannel: typeof MessageChannel;
-    let capturedChannel: { port1: MockMessagePort; port2: MockMessagePort } | undefined;
+    let capturedChannel:
+      | { port1: MockMessagePort; port2: MockMessagePort }
+      | undefined;
 
     beforeEach(() => {
       capturedChannel = undefined;
@@ -2290,21 +2428,20 @@ describe("endpoint/service-worker", () => {
       globalThis.MessageChannel = originalMessageChannel;
     });
 
-    test("send() passes the message directly to port.postMessage without transformation (client-side)", async () => {
+    test("send() passes the message directly to port.postMessage without transformation (client-side)", () => {
       const sw = createMockServiceWorker();
 
-      const promise = serviceWorkerEndpoint(sw as any, { timeout: 5000 });
-      await new Promise((r) => setTimeout(r, 10));
+      const endpoint = serviceWorkerEndpoint(sw as any, { timeout: 5000 });
 
       capturedChannel!.port1.dispatchMessage({ type: "fractal:ack" });
 
-      const endpoint = await Promise.race([
-        promise,
-        new Promise<never>((_, rej) => setTimeout(() => rej(new Error("test timeout")), 500)),
-      ]);
-
       // Send a complex JSON-RPC message with various fields
-      const msg = { jsonrpc: "2.0", method: "user.get", params: { id: "123", nested: { deep: true } }, id: 42 };
+      const msg = {
+        jsonrpc: "2.0",
+        method: "user.get",
+        params: { id: "123", nested: { deep: true } },
+        id: 42,
+      };
       endpoint.send(msg);
 
       // Verify the exact same object reference is passed (no wrapping, cloning, or transformation)
@@ -2332,7 +2469,11 @@ describe("endpoint/service-worker", () => {
         // Clear the ack postMessage call
         port.postMessage.mockClear();
 
-        const msg = { jsonrpc: "2.0", result: { name: "Alice", items: [1, 2, 3] }, id: 99 };
+        const msg = {
+          jsonrpc: "2.0",
+          result: { name: "Alice", items: [1, 2, 3] },
+          id: 99,
+        };
         endpoint.send(msg);
 
         // Verify the exact same object reference is passed (no wrapping or transformation)
@@ -2365,10 +2506,9 @@ describe("endpoint/service-worker", () => {
       globalThis.MessageChannel = originalMessageChannel;
     });
 
-    test("handshake message is exactly { type: 'fractal:connect' } with no additional properties", async () => {
+    test("handshake message is exactly { type: 'fractal:connect' } with no additional properties", () => {
       const sw = createMockServiceWorker();
-      const promise = serviceWorkerEndpoint(sw as any, { timeout: 100 }).catch(() => {});
-      await new Promise((r) => setTimeout(r, 10));
+      serviceWorkerEndpoint(sw as any, { timeout: 100 });
 
       expect(sw.postMessage).toHaveBeenCalled();
       const handshakeMsg = sw.postMessage.mock.calls[0]?.[0];
@@ -2392,7 +2532,9 @@ describe("endpoint/service-worker", () => {
 
   describe("onMessage handler receives MessageEvent-like second argument", () => {
     let originalMessageChannel: typeof MessageChannel;
-    let capturedChannel: { port1: MockMessagePort; port2: MockMessagePort } | undefined;
+    let capturedChannel:
+      | { port1: MockMessagePort; port2: MockMessagePort }
+      | undefined;
 
     beforeEach(() => {
       capturedChannel = undefined;
@@ -2412,23 +2554,22 @@ describe("endpoint/service-worker", () => {
       globalThis.MessageChannel = originalMessageChannel;
     });
 
-    test("second argument to onMessage handler has a data property matching the message (client-side)", async () => {
+    test("second argument to onMessage handler has a data property matching the message (client-side)", () => {
       const sw = createMockServiceWorker();
 
-      const promise = serviceWorkerEndpoint(sw as any, { timeout: 5000 });
-      await new Promise((r) => setTimeout(r, 10));
+      const endpoint = serviceWorkerEndpoint(sw as any, { timeout: 5000 });
 
       capturedChannel!.port1.dispatchMessage({ type: "fractal:ack" });
-
-      const endpoint = await Promise.race([
-        promise,
-        new Promise<never>((_, rej) => setTimeout(() => rej(new Error("test timeout")), 500)),
-      ]);
 
       const handler = vi.fn();
       endpoint.onMessage(handler);
 
-      const msg = { jsonrpc: "2.0", method: "test.method", params: { key: "value" }, id: 7 };
+      const msg = {
+        jsonrpc: "2.0",
+        method: "test.method",
+        params: { key: "value" },
+        id: 7,
+      };
       capturedChannel!.port1.dispatchMessage(msg);
 
       expect(handler).toHaveBeenCalledTimes(1);
@@ -2461,7 +2602,12 @@ describe("endpoint/service-worker", () => {
         const handler = vi.fn();
         endpoint.onMessage(handler);
 
-        const msg = { jsonrpc: "2.0", method: "test.method", params: { foo: "bar" }, id: 10 };
+        const msg = {
+          jsonrpc: "2.0",
+          method: "test.method",
+          params: { foo: "bar" },
+          id: 10,
+        };
         port.dispatchMessage(msg);
 
         expect(handler).toHaveBeenCalledTimes(1);
@@ -2478,18 +2624,12 @@ describe("endpoint/service-worker", () => {
       }
     });
 
-    test("first argument to onMessage handler is the data, second is the event containing that data", async () => {
+    test("first argument to onMessage handler is the data, second is the event containing that data", () => {
       const sw = createMockServiceWorker();
 
-      const promise = serviceWorkerEndpoint(sw as any, { timeout: 5000 });
-      await new Promise((r) => setTimeout(r, 10));
+      const endpoint = serviceWorkerEndpoint(sw as any, { timeout: 5000 });
 
       capturedChannel!.port1.dispatchMessage({ type: "fractal:ack" });
-
-      const endpoint = await Promise.race([
-        promise,
-        new Promise<never>((_, rej) => setTimeout(() => rej(new Error("test timeout")), 500)),
-      ]);
 
       const handler = vi.fn();
       endpoint.onMessage(handler);
@@ -2511,7 +2651,9 @@ describe("endpoint/service-worker", () => {
 
   describe("options: undefined and options: {} variants", () => {
     let originalMessageChannel: typeof MessageChannel;
-    let capturedChannel: { port1: MockMessagePort; port2: MockMessagePort } | undefined;
+    let capturedChannel:
+      | { port1: MockMessagePort; port2: MockMessagePort }
+      | undefined;
 
     beforeEach(() => {
       capturedChannel = undefined;
@@ -2531,54 +2673,38 @@ describe("endpoint/service-worker", () => {
       globalThis.MessageChannel = originalMessageChannel;
     });
 
-    test("serviceWorkerEndpoint(sw, undefined) works correctly with no timeout", async () => {
+    test("serviceWorkerEndpoint(sw, undefined) works correctly with no timeout", () => {
       const sw = createMockServiceWorker();
 
-      const promise = serviceWorkerEndpoint(sw as any, undefined);
+      const endpoint = serviceWorkerEndpoint(sw as any, undefined);
 
-      // Should not reject immediately (no timeout)
-      const raceResult = await Promise.race([
-        promise.then(() => "resolved").catch(() => "rejected"),
-        new Promise<string>((r) => setTimeout(() => r("pending"), 50)),
-      ]);
-      expect(raceResult).toBe("pending");
-
-      // Now ack to resolve the handshake
-      await new Promise((r) => setTimeout(r, 10));
-      capturedChannel!.port1.dispatchMessage({ type: "fractal:ack" });
-
-      const endpoint = await Promise.race([
-        promise,
-        new Promise<never>((_, rej) => setTimeout(() => rej(new Error("test timeout")), 500)),
-      ]);
       expect(endpoint).toBeDefined();
       expect(typeof endpoint.send).toBe("function");
       expect(typeof endpoint.onMessage).toBe("function");
+
+      // Ack and verify full functionality
+      capturedChannel!.port1.dispatchMessage({ type: "fractal:ack" });
+
+      const msg = { jsonrpc: "2.0", method: "ping", id: 1 };
+      endpoint.send(msg);
+      expect(capturedChannel!.port1.postMessage).toHaveBeenCalledWith(msg);
     });
 
-    test("serviceWorkerEndpoint(sw, {}) works correctly with no timeout", async () => {
+    test("serviceWorkerEndpoint(sw, {}) works correctly with no timeout", () => {
       const sw = createMockServiceWorker();
 
-      const promise = serviceWorkerEndpoint(sw as any, {});
+      const endpoint = serviceWorkerEndpoint(sw as any, {});
 
-      // Should not reject immediately (no timeout since options.timeout is undefined)
-      const raceResult = await Promise.race([
-        promise.then(() => "resolved").catch(() => "rejected"),
-        new Promise<string>((r) => setTimeout(() => r("pending"), 50)),
-      ]);
-      expect(raceResult).toBe("pending");
-
-      // Now ack to resolve the handshake
-      await new Promise((r) => setTimeout(r, 10));
-      capturedChannel!.port1.dispatchMessage({ type: "fractal:ack" });
-
-      const endpoint = await Promise.race([
-        promise,
-        new Promise<never>((_, rej) => setTimeout(() => rej(new Error("test timeout")), 500)),
-      ]);
       expect(endpoint).toBeDefined();
       expect(typeof endpoint.send).toBe("function");
       expect(typeof endpoint.onMessage).toBe("function");
+
+      // Ack and verify full functionality
+      capturedChannel!.port1.dispatchMessage({ type: "fractal:ack" });
+
+      const msg = { jsonrpc: "2.0", method: "ping", id: 1 };
+      endpoint.send(msg);
+      expect(capturedChannel!.port1.postMessage).toHaveBeenCalledWith(msg);
     });
   });
 
@@ -2596,7 +2722,10 @@ describe("endpoint/service-worker", () => {
     test("one handshake times out while the other succeeds with the same controller", async () => {
       const sw = createMockServiceWorker();
 
-      const capturedChannels: { port1: MockMessagePort; port2: MockMessagePort }[] = [];
+      const capturedChannels: {
+        port1: MockMessagePort;
+        port2: MockMessagePort;
+      }[] = [];
       globalThis.MessageChannel = class MockMessageChannel {
         port1: MockMessagePort;
         port2: MockMessagePort;
@@ -2608,23 +2737,19 @@ describe("endpoint/service-worker", () => {
       } as any;
 
       // First call with short timeout that will expire
-      const promise1 = serviceWorkerEndpoint(sw as any, { timeout: 30 });
+      const endpoint1 = serviceWorkerEndpoint(sw as any, { timeout: 30 });
       // Second call with long timeout that will succeed
-      const promise2 = serviceWorkerEndpoint(sw as any, { timeout: 5000 });
-      await new Promise((r) => setTimeout(r, 10));
+      const endpoint2 = serviceWorkerEndpoint(sw as any, { timeout: 5000 });
 
       expect(capturedChannels.length).toBe(2);
 
-      // Let promise1's timeout expire
-      await expect(promise1).rejects.toMatchObject({ code: "TIMEOUT" });
+      // Let endpoint1's timeout expire
+      await new Promise((r) => setTimeout(r, 40));
+      expect(() => endpoint1.send({})).toThrow(FractalError);
 
-      // Now ack only the second port - promise2 should resolve successfully
+      // Now ack only the second port - endpoint2 should work
       capturedChannels[1].port1.dispatchMessage({ type: "fractal:ack" });
 
-      const endpoint2 = await Promise.race([
-        promise2,
-        new Promise<never>((_, rej) => setTimeout(() => rej(new Error("test timeout")), 500)),
-      ]);
       expect(endpoint2).toBeDefined();
       expect(typeof endpoint2.send).toBe("function");
       expect(typeof endpoint2.onMessage).toBe("function");
@@ -2635,7 +2760,10 @@ describe("endpoint/service-worker", () => {
       const msg = { jsonrpc: "2.0", method: "ping", id: 1 };
       capturedChannels[1].port1.dispatchMessage(msg);
       expect(handler).toHaveBeenCalledTimes(1);
-      expect(handler).toHaveBeenCalledWith(msg, expect.objectContaining({ data: msg }));
+      expect(handler).toHaveBeenCalledWith(
+        msg,
+        expect.objectContaining({ data: msg }),
+      );
     });
   });
 
@@ -2704,12 +2832,11 @@ describe("endpoint/service-worker", () => {
       globalThis.MessageChannel = originalMessageChannel;
     });
 
-    test("addEventListener for ack listener is called before port.start() during handshake", async () => {
+    test("addEventListener for ack listener is called before port.start() during handshake", () => {
       const sw = createMockServiceWorker();
 
       // Track call ordering on the port that is used for listening (port1 of the MockMessageChannel)
       const callOrder: string[] = [];
-      let localCapturedChannel: { port1: MockMessagePort; port2: MockMessagePort } | undefined;
       // We need to intercept the port1 that will be created.
       // Override MockMessageChannel to track call order on port1.
       globalThis.MessageChannel = class OrderTrackingMockMessageChannel {
@@ -2718,7 +2845,6 @@ describe("endpoint/service-worker", () => {
         constructor() {
           this.port1 = createMockMessagePort();
           this.port2 = createMockMessagePort();
-          localCapturedChannel = this;
 
           // Wrap addEventListener and start to track call ordering
           const origAddEventListener = this.port1.addEventListener;
@@ -2735,8 +2861,7 @@ describe("endpoint/service-worker", () => {
         }
       } as any;
 
-      const promise = serviceWorkerEndpoint(sw as any, { timeout: 5000 });
-      await new Promise((r) => setTimeout(r, 10));
+      serviceWorkerEndpoint(sw as any, { timeout: 5000 });
 
       // Verify addEventListener was called before start
       const addEventListenerIndex = callOrder.indexOf("addEventListener");
@@ -2744,19 +2869,14 @@ describe("endpoint/service-worker", () => {
       expect(addEventListenerIndex).not.toBe(-1);
       expect(startIndex).not.toBe(-1);
       expect(addEventListenerIndex).toBeLessThan(startIndex);
-
-      // Clean up by acking and resolving the promise
-      localCapturedChannel!.port1.dispatchMessage({ type: "fractal:ack" });
-      await Promise.race([
-        promise,
-        new Promise<never>((_, rej) => setTimeout(() => rej(new Error("test timeout")), 500)),
-      ]);
     });
   });
 
   describe("unsubscribe function return value", () => {
     let originalMessageChannel: typeof MessageChannel;
-    let capturedChannel: { port1: MockMessagePort; port2: MockMessagePort } | undefined;
+    let capturedChannel:
+      | { port1: MockMessagePort; port2: MockMessagePort }
+      | undefined;
 
     beforeEach(() => {
       capturedChannel = undefined;
@@ -2776,18 +2896,12 @@ describe("endpoint/service-worker", () => {
       globalThis.MessageChannel = originalMessageChannel;
     });
 
-    test("calling the unsubscribe function returns exactly undefined (client-side)", async () => {
+    test("calling the unsubscribe function returns exactly undefined (client-side)", () => {
       const sw = createMockServiceWorker();
 
-      const promise = serviceWorkerEndpoint(sw as any, { timeout: 5000 });
-      await new Promise((r) => setTimeout(r, 10));
+      const endpoint = serviceWorkerEndpoint(sw as any, { timeout: 5000 });
 
       capturedChannel!.port1.dispatchMessage({ type: "fractal:ack" });
-
-      const endpoint = await Promise.race([
-        promise,
-        new Promise<never>((_, rej) => setTimeout(() => rej(new Error("test timeout")), 500)),
-      ]);
 
       const handler = vi.fn();
       const unsubscribe = endpoint.onMessage(handler);
@@ -2825,7 +2939,9 @@ describe("endpoint/service-worker", () => {
 
   describe("non-ack messages on port during handshake", () => {
     let originalMessageChannel: typeof MessageChannel;
-    let capturedChannel: { port1: MockMessagePort; port2: MockMessagePort } | undefined;
+    let capturedChannel:
+      | { port1: MockMessagePort; port2: MockMessagePort }
+      | undefined;
 
     beforeEach(() => {
       capturedChannel = undefined;
@@ -2845,66 +2961,60 @@ describe("endpoint/service-worker", () => {
       globalThis.MessageChannel = originalMessageChannel;
     });
 
-    test("non-ack messages on port during handshake do not resolve the promise", async () => {
+    test("non-ack messages on port during handshake do not activate the endpoint", () => {
       const sw = createMockServiceWorker();
 
-      const promise = serviceWorkerEndpoint(sw as any, { timeout: 5000 });
-      await new Promise((r) => setTimeout(r, 10));
+      const endpoint = serviceWorkerEndpoint(sw as any, { timeout: 5000 });
       expect(capturedChannel).toBeDefined();
 
       // Send various non-ack messages on the port during handshake
-      capturedChannel!.port1.dispatchMessage({ type: "fractal:something-else" });
+      capturedChannel!.port1.dispatchMessage({
+        type: "fractal:something-else",
+      });
       capturedChannel!.port1.dispatchMessage({ type: "unrelated" });
       capturedChannel!.port1.dispatchMessage({});
-      capturedChannel!.port1.dispatchMessage({ jsonrpc: "2.0", method: "ping", id: 1 });
+      capturedChannel!.port1.dispatchMessage({
+        jsonrpc: "2.0",
+        method: "ping",
+        id: 1,
+      });
       capturedChannel!.port1.dispatchMessage(null);
       capturedChannel!.port1.dispatchMessage("hello");
 
-      // The promise should still be pending (not resolved)
-      const result = await Promise.race([
-        promise.then(() => "resolved").catch(() => "rejected"),
-        new Promise<string>((r) => setTimeout(() => r("pending"), 50)),
-      ]);
-      expect(result).toBe("pending");
+      // send() should still buffer (not flush), proving endpoint is not yet activated
+      const msg = { jsonrpc: "2.0", method: "test", id: 99 };
+      endpoint.send(msg);
+      expect(capturedChannel!.port1.postMessage).not.toHaveBeenCalled();
 
-      // Now send the actual ack and verify it resolves
+      // Now send the actual ack and verify it activates
       capturedChannel!.port1.dispatchMessage({ type: "fractal:ack" });
 
-      const endpoint = await Promise.race([
-        promise,
-        new Promise<never>((_, rej) => setTimeout(() => rej(new Error("test timeout")), 500)),
-      ]);
-      expect(endpoint).toBeDefined();
-      expect(typeof endpoint.send).toBe("function");
-      expect(typeof endpoint.onMessage).toBe("function");
+      // The buffered message should have been flushed
+      expect(capturedChannel!.port1.postMessage).toHaveBeenCalledWith(msg);
     });
 
-    test("non-ack messages do not cause errors during handshake phase", async () => {
+    test("non-ack messages do not cause errors during handshake phase", () => {
       const sw = createMockServiceWorker();
 
-      const promise = serviceWorkerEndpoint(sw as any, { timeout: 5000 });
-      await new Promise((r) => setTimeout(r, 10));
+      serviceWorkerEndpoint(sw as any, { timeout: 5000 });
       expect(capturedChannel).toBeDefined();
 
       // These should not throw
       expect(() => {
-        capturedChannel!.port1.dispatchMessage({ type: "fractal:something-else" });
+        capturedChannel!.port1.dispatchMessage({
+          type: "fractal:something-else",
+        });
         capturedChannel!.port1.dispatchMessage({ type: "unrelated" });
         capturedChannel!.port1.dispatchMessage({});
       }).not.toThrow();
-
-      // Clean up: ack and resolve
-      capturedChannel!.port1.dispatchMessage({ type: "fractal:ack" });
-      await Promise.race([
-        promise,
-        new Promise<never>((_, rej) => setTimeout(() => rej(new Error("test timeout")), 500)),
-      ]);
     });
   });
 
   describe("send() exception propagation on client-side endpoint", () => {
     let originalMessageChannel: typeof MessageChannel;
-    let capturedChannel: { port1: MockMessagePort; port2: MockMessagePort } | undefined;
+    let capturedChannel:
+      | { port1: MockMessagePort; port2: MockMessagePort }
+      | undefined;
 
     beforeEach(() => {
       capturedChannel = undefined;
@@ -2924,21 +3034,17 @@ describe("endpoint/service-worker", () => {
       globalThis.MessageChannel = originalMessageChannel;
     });
 
-    test("send() on client-side endpoint propagates port.postMessage exceptions", async () => {
+    test("send() on client-side endpoint propagates port.postMessage exceptions", () => {
       const sw = createMockServiceWorker();
 
-      const promise = serviceWorkerEndpoint(sw as any, { timeout: 5000 });
-      await new Promise((r) => setTimeout(r, 10));
+      const endpoint = serviceWorkerEndpoint(sw as any, { timeout: 5000 });
 
       capturedChannel!.port1.dispatchMessage({ type: "fractal:ack" });
 
-      const endpoint = await Promise.race([
-        promise,
-        new Promise<never>((_, rej) => setTimeout(() => rej(new Error("test timeout")), 500)),
-      ]);
-
       // Make port.postMessage throw
-      const sendError = new DOMException("DataCloneError: The object could not be cloned");
+      const sendError = new DOMException(
+        "DataCloneError: The object could not be cloned",
+      );
       capturedChannel!.port1.postMessage.mockImplementation(() => {
         throw sendError;
       });
@@ -2948,18 +3054,12 @@ describe("endpoint/service-worker", () => {
       }).toThrow("DataCloneError: The object could not be cloned");
     });
 
-    test("send() on client-side endpoint propagates the exact error thrown by port.postMessage", async () => {
+    test("send() on client-side endpoint propagates the exact error thrown by port.postMessage", () => {
       const sw = createMockServiceWorker();
 
-      const promise = serviceWorkerEndpoint(sw as any, { timeout: 5000 });
-      await new Promise((r) => setTimeout(r, 10));
+      const endpoint = serviceWorkerEndpoint(sw as any, { timeout: 5000 });
 
       capturedChannel!.port1.dispatchMessage({ type: "fractal:ack" });
-
-      const endpoint = await Promise.race([
-        promise,
-        new Promise<never>((_, rej) => setTimeout(() => rej(new Error("test timeout")), 500)),
-      ]);
 
       const customError = new TypeError("port is closed");
       capturedChannel!.port1.postMessage.mockImplementation(() => {
@@ -3018,15 +3118,19 @@ describe("endpoint/service-worker", () => {
         const listeners: Array<(event: MessageEvent) => void> = [];
         const portWithoutStart = {
           postMessage: vi.fn(),
-          addEventListener: vi.fn((type: string, handler: (event: MessageEvent) => void) => {
-            if (type === "message") listeners.push(handler);
-          }),
-          removeEventListener: vi.fn((type: string, handler: (event: MessageEvent) => void) => {
-            if (type === "message") {
-              const idx = listeners.indexOf(handler);
-              if (idx !== -1) listeners.splice(idx, 1);
-            }
-          }),
+          addEventListener: vi.fn(
+            (type: string, handler: (event: MessageEvent) => void) => {
+              if (type === "message") listeners.push(handler);
+            },
+          ),
+          removeEventListener: vi.fn(
+            (type: string, handler: (event: MessageEvent) => void) => {
+              if (type === "message") {
+                const idx = listeners.indexOf(handler);
+                if (idx !== -1) listeners.splice(idx, 1);
+              }
+            },
+          ),
           // Deliberately omitting start()
         };
 
@@ -3046,7 +3150,9 @@ describe("endpoint/service-worker", () => {
         expect(typeof endpoint.onMessage).toBe("function");
 
         // Ack should still be sent
-        expect(portWithoutStart.postMessage).toHaveBeenCalledWith({ type: "fractal:ack" });
+        expect(portWithoutStart.postMessage).toHaveBeenCalledWith({
+          type: "fractal:ack",
+        });
 
         // endpoint.send() should work
         const msg = { jsonrpc: "2.0", result: "ok", id: 1 };
@@ -3074,34 +3180,16 @@ describe("endpoint/service-worker", () => {
       }
     });
 
-    test("client-side endpoint works with port-like object where start is not a function", async () => {
+    test("client-side endpoint works with port-like object where start is not a function", () => {
       const originalMessageChannel = globalThis.MessageChannel;
 
-      // Create a port-like object where start is not a function (e.g., undefined)
-      const listeners: Array<(event: MessageEvent) => void> = [];
-      const portWithoutStart = {
-        postMessage: vi.fn(),
-        addEventListener: vi.fn((type: string, handler: (event: MessageEvent) => void) => {
-          if (type === "message") listeners.push(handler);
-        }),
-        removeEventListener: vi.fn((type: string, handler: (event: MessageEvent) => void) => {
-          if (type === "message") {
-            const idx = listeners.indexOf(handler);
-            if (idx !== -1) listeners.splice(idx, 1);
-          }
-        }),
-        // start is not a function (it's a string)
-        start: "not-a-function",
-      };
-
-      let localCapturedChannel: { port1: MockMessagePort; port2: MockMessagePort } | undefined;
+      let localCapturedChannel:
+        | { port1: MockMessagePort; port2: MockMessagePort }
+        | undefined;
       globalThis.MessageChannel = class MockMessageChannel {
         port1: any;
         port2: any;
         constructor() {
-          // port1 needs start() for the handshake ack listener,
-          // but after handshake, createPortEndpoint is called with port1 again.
-          // We need port1 to have proper start for the handshake phase.
           this.port1 = createMockMessagePort();
           this.port2 = createMockMessagePort();
           localCapturedChannel = this;
@@ -3111,15 +3199,9 @@ describe("endpoint/service-worker", () => {
       try {
         const sw = createMockServiceWorker();
 
-        const promise = serviceWorkerEndpoint(sw as any, { timeout: 5000 });
-        await new Promise((r) => setTimeout(r, 10));
+        const endpoint = serviceWorkerEndpoint(sw as any, { timeout: 5000 });
 
         localCapturedChannel!.port1.dispatchMessage({ type: "fractal:ack" });
-
-        const endpoint = await Promise.race([
-          promise,
-          new Promise<never>((_, rej) => setTimeout(() => rej(new Error("test timeout")), 500)),
-        ]);
 
         // After handshake, the endpoint wraps port1 via createPortEndpoint.
         // Replace port1.start with a non-function to simulate the guard.

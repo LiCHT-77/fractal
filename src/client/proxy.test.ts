@@ -1,5 +1,9 @@
-import { createClient, RpcError, FractalError } from "./proxy.ts";
-import { createMockEndpoint, makeSuccessResponse, makeErrorResponse } from "../test-helpers.ts";
+import {
+  createMockEndpoint,
+  makeErrorResponse,
+  makeSuccessResponse,
+} from "../test-helpers.ts";
+import { createClient, FractalError, RpcError } from "./proxy.ts";
 
 describe("client/proxy", () => {
   // ─── Basic RPC calls ───
@@ -68,9 +72,18 @@ describe("client/proxy", () => {
       client.b();
       client.c();
 
-      expect(endpoint.send).toHaveBeenNthCalledWith(1, expect.objectContaining({ id: 1 }));
-      expect(endpoint.send).toHaveBeenNthCalledWith(2, expect.objectContaining({ id: 2 }));
-      expect(endpoint.send).toHaveBeenNthCalledWith(3, expect.objectContaining({ id: 3 }));
+      expect(endpoint.send).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({ id: 1 }),
+      );
+      expect(endpoint.send).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({ id: 2 }),
+      );
+      expect(endpoint.send).toHaveBeenNthCalledWith(
+        3,
+        expect.objectContaining({ id: 3 }),
+      );
 
       // Resolve all pending
       endpoint.receive(makeSuccessResponse(null, 1));
@@ -84,7 +97,10 @@ describe("client/proxy", () => {
 
       client.ping();
 
-      const sentMessage = endpoint.send.mock.calls[0]?.[0] as Record<string, unknown>;
+      const sentMessage = endpoint.send.mock.calls[0]?.[0] as Record<
+        string,
+        unknown
+      >;
       expect(sentMessage.params).toBeUndefined();
 
       endpoint.receive(makeSuccessResponse("pong", 1));
@@ -109,7 +125,10 @@ describe("client/proxy", () => {
 
       client.ping();
 
-      const sentMessage = endpoint.send.mock.calls[0]?.[0] as Record<string, unknown>;
+      const sentMessage = endpoint.send.mock.calls[0]?.[0] as Record<
+        string,
+        unknown
+      >;
       expect("params" in sentMessage).toBe(false);
 
       endpoint.receive(makeSuccessResponse("pong", 1));
@@ -151,7 +170,9 @@ describe("client/proxy", () => {
       const client = createClient(endpoint);
 
       const promise = client.fail();
-      endpoint.receive(makeErrorResponse(-32000, "Custom", 1, { detail: "info" }));
+      endpoint.receive(
+        makeErrorResponse(-32000, "Custom", 1, { detail: "info" }),
+      );
 
       try {
         await promise;
@@ -222,7 +243,9 @@ describe("client/proxy", () => {
       });
       const client = createClient(endpoint);
 
-      expect(() => client.$notify.log.info({ msg: "test" })).toThrow("port closed");
+      expect(() => client.$notify.log.info({ msg: "test" })).toThrow(
+        "port closed",
+      );
     });
 
     test("notification with nested namespace", () => {
@@ -245,7 +268,10 @@ describe("client/proxy", () => {
 
       client.$notify.ping();
 
-      const sentMessage = endpoint.send.mock.calls[0]?.[0] as Record<string, unknown>;
+      const sentMessage = endpoint.send.mock.calls[0]?.[0] as Record<
+        string,
+        unknown
+      >;
       expect(sentMessage.params).toBeUndefined();
       expect("id" in sentMessage).toBe(false);
     });
@@ -384,7 +410,9 @@ describe("client/proxy", () => {
       const client = createClient(endpoint);
       client.dispose();
 
-      expect(() => client.$notify.log.info({ msg: "test" })).toThrow(FractalError);
+      expect(() => client.$notify.log.info({ msg: "test" })).toThrow(
+        FractalError,
+      );
       try {
         client.$notify.log.info({ msg: "test" });
       } catch (e) {
@@ -549,7 +577,9 @@ describe("client/proxy", () => {
     test("cleans up pending entry when send() throws", async () => {
       const endpoint = createMockEndpoint();
       endpoint.send
-        .mockImplementationOnce(() => { throw new Error("fail"); })
+        .mockImplementationOnce(() => {
+          throw new Error("fail");
+        })
         .mockImplementation(() => {});
       const client = createClient(endpoint);
 
@@ -648,8 +678,12 @@ describe("client/proxy", () => {
       client1.a();
       client2.b();
 
-      expect(endpoint1.send).toHaveBeenCalledWith(expect.objectContaining({ id: 1 }));
-      expect(endpoint2.send).toHaveBeenCalledWith(expect.objectContaining({ id: 1 }));
+      expect(endpoint1.send).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 1 }),
+      );
+      expect(endpoint2.send).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 1 }),
+      );
 
       endpoint1.receive(makeSuccessResponse(null, 1));
       endpoint2.receive(makeSuccessResponse(null, 1));
@@ -686,17 +720,23 @@ describe("client/proxy", () => {
   describe("defaultTimeout validation", () => {
     test("negative defaultTimeout throws TypeError", () => {
       const endpoint = createMockEndpoint();
-      expect(() => createClient(endpoint, { defaultTimeout: -1 })).toThrow(TypeError);
+      expect(() => createClient(endpoint, { defaultTimeout: -1 })).toThrow(
+        TypeError,
+      );
     });
 
     test("NaN defaultTimeout throws TypeError", () => {
       const endpoint = createMockEndpoint();
-      expect(() => createClient(endpoint, { defaultTimeout: Number.NaN })).toThrow(TypeError);
+      expect(() =>
+        createClient(endpoint, { defaultTimeout: Number.NaN }),
+      ).toThrow(TypeError);
     });
 
     test("defaultTimeout: Infinity does NOT throw TypeError (it is valid)", () => {
       const endpoint = createMockEndpoint();
-      expect(() => createClient(endpoint, { defaultTimeout: Number.POSITIVE_INFINITY })).not.toThrow();
+      expect(() =>
+        createClient(endpoint, { defaultTimeout: Number.POSITIVE_INFINITY }),
+      ).not.toThrow();
     });
 
     test("defaultTimeout: 0 triggers immediate timeout", async () => {
@@ -742,9 +782,11 @@ describe("client/proxy", () => {
   describe("send failure cleanup", () => {
     test("late response for a failed send is ignored (no unhandled errors)", async () => {
       const endpoint = createMockEndpoint();
-      endpoint.send.mockImplementationOnce(() => {
-        throw new Error("send failed");
-      }).mockImplementation(() => {});
+      endpoint.send
+        .mockImplementationOnce(() => {
+          throw new Error("send failed");
+        })
+        .mockImplementation(() => {});
       const client = createClient(endpoint);
 
       // First call fails on send — id 1 should be cleaned up
@@ -765,7 +807,9 @@ describe("client/proxy", () => {
   describe("defaultTimeout: Infinity", () => {
     test("defaultTimeout: Infinity behaves identically to omitting defaultTimeout (no timeout occurs)", async () => {
       const endpoint = createMockEndpoint();
-      const client = createClient(endpoint, { defaultTimeout: Number.POSITIVE_INFINITY });
+      const client = createClient(endpoint, {
+        defaultTimeout: Number.POSITIVE_INFINITY,
+      });
 
       const promise = client.wait();
 
@@ -825,7 +869,10 @@ describe("client/proxy", () => {
 
       client.$notify.ping();
 
-      const sentMessage = endpoint.send.mock.calls[0]?.[0] as Record<string, unknown>;
+      const sentMessage = endpoint.send.mock.calls[0]?.[0] as Record<
+        string,
+        unknown
+      >;
       expect("params" in sentMessage).toBe(false);
     });
   });
@@ -1054,7 +1101,10 @@ describe("client/proxy", () => {
 
       client.ping();
 
-      const sentMessage = endpoint.send.mock.calls[0]?.[0] as Record<string, unknown>;
+      const sentMessage = endpoint.send.mock.calls[0]?.[0] as Record<
+        string,
+        unknown
+      >;
       expect(Object.keys(sentMessage)).not.toContain("params");
 
       endpoint.receive(makeSuccessResponse("pong", 1));
@@ -1066,7 +1116,10 @@ describe("client/proxy", () => {
 
       client.ping({});
 
-      const sentMessage = endpoint.send.mock.calls[0]?.[0] as Record<string, unknown>;
+      const sentMessage = endpoint.send.mock.calls[0]?.[0] as Record<
+        string,
+        unknown
+      >;
       expect(Object.keys(sentMessage)).toContain("params");
       expect(sentMessage.params).toEqual({});
 
@@ -1079,7 +1132,10 @@ describe("client/proxy", () => {
 
       client.echo({ text: "hi" });
 
-      const sentMessage = endpoint.send.mock.calls[0]?.[0] as Record<string, unknown>;
+      const sentMessage = endpoint.send.mock.calls[0]?.[0] as Record<
+        string,
+        unknown
+      >;
       expect(Object.keys(sentMessage)).toContain("params");
       expect(sentMessage.params).toEqual({ text: "hi" });
 
@@ -1096,7 +1152,10 @@ describe("client/proxy", () => {
 
       client.$notify.heartbeat();
 
-      const sentMessage = endpoint.send.mock.calls[0]?.[0] as Record<string, unknown>;
+      const sentMessage = endpoint.send.mock.calls[0]?.[0] as Record<
+        string,
+        unknown
+      >;
       expect(Object.keys(sentMessage)).not.toContain("params");
       // Also verify no id (notification)
       expect("id" in sentMessage).toBe(false);
@@ -1108,7 +1167,10 @@ describe("client/proxy", () => {
 
       client.$notify.heartbeat({});
 
-      const sentMessage = endpoint.send.mock.calls[0]?.[0] as Record<string, unknown>;
+      const sentMessage = endpoint.send.mock.calls[0]?.[0] as Record<
+        string,
+        unknown
+      >;
       expect(sentMessage.params).toEqual({});
       expect("id" in sentMessage).toBe(false);
     });
@@ -1119,7 +1181,10 @@ describe("client/proxy", () => {
 
       client.$notify.log.info({ level: "info" });
 
-      const sentMessage = endpoint.send.mock.calls[0]?.[0] as Record<string, unknown>;
+      const sentMessage = endpoint.send.mock.calls[0]?.[0] as Record<
+        string,
+        unknown
+      >;
       expect(sentMessage.params).toEqual({ level: "info" });
       expect("id" in sentMessage).toBe(false);
     });
@@ -1192,7 +1257,10 @@ describe("client/proxy", () => {
       });
 
       // Verify no id is present (notification)
-      const sentMessage = endpoint.send.mock.calls[0]?.[0] as Record<string, unknown>;
+      const sentMessage = endpoint.send.mock.calls[0]?.[0] as Record<
+        string,
+        unknown
+      >;
       expect("id" in sentMessage).toBe(false);
     });
 
@@ -1317,7 +1385,7 @@ describe("client/proxy", () => {
       expect(() => endpoint.receive(42)).not.toThrow();
     });
 
-    test("endpoint.receive(\"string\") does not crash", () => {
+    test('endpoint.receive("string") does not crash', () => {
       const endpoint = createMockEndpoint();
       createClient(endpoint);
 
@@ -1598,10 +1666,12 @@ describe("client/proxy", () => {
 
     test("-Infinity defaultTimeout throws TypeError", () => {
       const endpoint = createMockEndpoint();
-      expect(() => createClient(endpoint, { defaultTimeout: -Infinity })).toThrow(TypeError);
-      expect(() => createClient(endpoint, { defaultTimeout: -Infinity })).toThrow(
-        "defaultTimeout must be non-negative",
-      );
+      expect(() =>
+        createClient(endpoint, { defaultTimeout: -Infinity }),
+      ).toThrow(TypeError);
+      expect(() =>
+        createClient(endpoint, { defaultTimeout: -Infinity }),
+      ).toThrow("defaultTimeout must be non-negative");
     });
   });
 
@@ -1680,7 +1750,9 @@ describe("client/proxy", () => {
       client.dispose();
 
       // After dispose: should throw FractalError DISPOSED
-      expect(() => client.$notify.log.info({ msg: "after" })).toThrow(FractalError);
+      expect(() => client.$notify.log.info({ msg: "after" })).toThrow(
+        FractalError,
+      );
       try {
         client.$notify.log.info({ msg: "after" });
       } catch (e) {
@@ -1887,7 +1959,9 @@ describe("client/proxy", () => {
       expect(result).toBeUndefined();
       // Ensure it is not a Promise (not thenable)
       expect(result).not.toBeInstanceOf(Promise);
-      expect(typeof result === "object" && result !== null && "then" in result).toBe(false);
+      expect(
+        typeof result === "object" && result !== null && "then" in result,
+      ).toBe(false);
     });
   });
 
@@ -1986,9 +2060,18 @@ describe("client/proxy", () => {
       const p3 = client.third({ n: 3 });
 
       // Verify the ids assigned
-      expect(endpoint.send).toHaveBeenNthCalledWith(1, expect.objectContaining({ id: 1, method: "first" }));
-      expect(endpoint.send).toHaveBeenNthCalledWith(2, expect.objectContaining({ id: 2, method: "second" }));
-      expect(endpoint.send).toHaveBeenNthCalledWith(3, expect.objectContaining({ id: 3, method: "third" }));
+      expect(endpoint.send).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({ id: 1, method: "first" }),
+      );
+      expect(endpoint.send).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({ id: 2, method: "second" }),
+      );
+      expect(endpoint.send).toHaveBeenNthCalledWith(
+        3,
+        expect.objectContaining({ id: 3, method: "third" }),
+      );
 
       // Respond out of order: 3, 1, 2
       endpoint.receive(makeSuccessResponse("result-3", 3));
@@ -2014,8 +2097,12 @@ describe("client/proxy", () => {
       const p1 = client1.methodA({ from: "client1" });
       const p2 = client2.methodB({ from: "client2" });
 
-      expect(endpoint1.send).toHaveBeenCalledWith(expect.objectContaining({ id: 1, method: "methodA" }));
-      expect(endpoint2.send).toHaveBeenCalledWith(expect.objectContaining({ id: 1, method: "methodB" }));
+      expect(endpoint1.send).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 1, method: "methodA" }),
+      );
+      expect(endpoint2.send).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 1, method: "methodB" }),
+      );
 
       // Send response to endpoint2 first (id=1 for client2)
       endpoint2.receive(makeSuccessResponse("response-for-client2", 1));
@@ -2072,7 +2159,10 @@ describe("client/proxy", () => {
       // Pass a second argument (like call options) to $notify — it should be ignored
       (client.$notify.log.info as any)({ message: "hello" }, { timeout: 5000 });
 
-      const sentMessage = endpoint.send.mock.calls[0]?.[0] as Record<string, unknown>;
+      const sentMessage = endpoint.send.mock.calls[0]?.[0] as Record<
+        string,
+        unknown
+      >;
       // The sent notification should only contain jsonrpc, method, and params
       expect(sentMessage).toEqual({
         jsonrpc: "2.0",
@@ -2103,7 +2193,10 @@ describe("client/proxy", () => {
 
       client.method(0);
 
-      const sentMessage = endpoint.send.mock.calls[0]?.[0] as Record<string, unknown>;
+      const sentMessage = endpoint.send.mock.calls[0]?.[0] as Record<
+        string,
+        unknown
+      >;
       expect("params" in sentMessage).toBe(true);
       expect(sentMessage.params).toBe(0);
 
@@ -2116,7 +2209,10 @@ describe("client/proxy", () => {
 
       client.method(false);
 
-      const sentMessage = endpoint.send.mock.calls[0]?.[0] as Record<string, unknown>;
+      const sentMessage = endpoint.send.mock.calls[0]?.[0] as Record<
+        string,
+        unknown
+      >;
       expect("params" in sentMessage).toBe(true);
       expect(sentMessage.params).toBe(false);
 
@@ -2129,7 +2225,10 @@ describe("client/proxy", () => {
 
       client.method("");
 
-      const sentMessage = endpoint.send.mock.calls[0]?.[0] as Record<string, unknown>;
+      const sentMessage = endpoint.send.mock.calls[0]?.[0] as Record<
+        string,
+        unknown
+      >;
       expect("params" in sentMessage).toBe(true);
       expect(sentMessage.params).toBe("");
 
@@ -2142,7 +2241,10 @@ describe("client/proxy", () => {
 
       client.method(null);
 
-      const sentMessage = endpoint.send.mock.calls[0]?.[0] as Record<string, unknown>;
+      const sentMessage = endpoint.send.mock.calls[0]?.[0] as Record<
+        string,
+        unknown
+      >;
       expect("params" in sentMessage).toBe(true);
       expect(sentMessage.params).toBe(null);
 
@@ -2155,7 +2257,10 @@ describe("client/proxy", () => {
 
       client.$notify.method(0);
 
-      const sentMessage = endpoint.send.mock.calls[0]?.[0] as Record<string, unknown>;
+      const sentMessage = endpoint.send.mock.calls[0]?.[0] as Record<
+        string,
+        unknown
+      >;
       expect("params" in sentMessage).toBe(true);
       expect(sentMessage.params).toBe(0);
     });
@@ -2166,7 +2271,10 @@ describe("client/proxy", () => {
 
       client.$notify.method(false);
 
-      const sentMessage = endpoint.send.mock.calls[0]?.[0] as Record<string, unknown>;
+      const sentMessage = endpoint.send.mock.calls[0]?.[0] as Record<
+        string,
+        unknown
+      >;
       expect("params" in sentMessage).toBe(true);
       expect(sentMessage.params).toBe(false);
     });
@@ -2177,7 +2285,10 @@ describe("client/proxy", () => {
 
       client.$notify.method("");
 
-      const sentMessage = endpoint.send.mock.calls[0]?.[0] as Record<string, unknown>;
+      const sentMessage = endpoint.send.mock.calls[0]?.[0] as Record<
+        string,
+        unknown
+      >;
       expect("params" in sentMessage).toBe(true);
       expect(sentMessage.params).toBe("");
     });
@@ -2248,7 +2359,9 @@ describe("client/proxy", () => {
 
       client.dispose();
 
-      expect(() => client.$notify.log.info({ msg: "hello" })).toThrow(FractalError);
+      expect(() => client.$notify.log.info({ msg: "hello" })).toThrow(
+        FractalError,
+      );
       try {
         client.$notify.log.info({ msg: "hello" });
         expect.unreachable("should have thrown");
@@ -2479,7 +2592,7 @@ describe("client/proxy", () => {
       endpoint.receive({ jsonrpc: "2.0", error: {}, id: 1 });
 
       await expect(promise).rejects.toThrow(RpcError);
-      const err = await promise.catch((e: unknown) => e) as RpcError;
+      const err = (await promise.catch((e: unknown) => e)) as RpcError;
       expect(err).toBeInstanceOf(RpcError);
       expect(err.code).toBeUndefined();
       // Error(undefined) sets message to "" in JavaScript
@@ -2491,10 +2604,14 @@ describe("client/proxy", () => {
       const client = createClient(endpoint);
 
       const promise = client.ping();
-      endpoint.receive({ jsonrpc: "2.0", error: { code: "not-a-number", message: "bad" }, id: 1 });
+      endpoint.receive({
+        jsonrpc: "2.0",
+        error: { code: "not-a-number", message: "bad" },
+        id: 1,
+      });
 
       await expect(promise).rejects.toThrow(RpcError);
-      const err = await promise.catch((e: unknown) => e) as RpcError;
+      const err = (await promise.catch((e: unknown) => e)) as RpcError;
       expect(err).toBeInstanceOf(RpcError);
       // code is set to whatever was in the response, even if not a number
       expect(err.code).toBe("not-a-number");
@@ -2511,7 +2628,10 @@ describe("client/proxy", () => {
 
       client.ping(undefined);
 
-      const sentMessage = endpoint.send.mock.calls[0]?.[0] as Record<string, unknown>;
+      const sentMessage = endpoint.send.mock.calls[0]?.[0] as Record<
+        string,
+        unknown
+      >;
       expect("params" in sentMessage).toBe(false);
 
       endpoint.receive(makeSuccessResponse("pong", 1));
@@ -2523,7 +2643,10 @@ describe("client/proxy", () => {
 
       client.$notify.ping(undefined);
 
-      const sentMessage = endpoint.send.mock.calls[0]?.[0] as Record<string, unknown>;
+      const sentMessage = endpoint.send.mock.calls[0]?.[0] as Record<
+        string,
+        unknown
+      >;
       expect("params" in sentMessage).toBe(false);
     });
   });
@@ -2533,7 +2656,9 @@ describe("client/proxy", () => {
   describe("defaultTimeout: Infinity + per-call finite timeout", () => {
     test("client with defaultTimeout: Infinity still respects a finite per-call timeout", async () => {
       const endpoint = createMockEndpoint();
-      const client = createClient(endpoint, { defaultTimeout: Number.POSITIVE_INFINITY });
+      const client = createClient(endpoint, {
+        defaultTimeout: Number.POSITIVE_INFINITY,
+      });
 
       const promise = client.slow({}, { timeout: 50 });
 
@@ -2544,7 +2669,9 @@ describe("client/proxy", () => {
 
     test("client with defaultTimeout: Infinity — calls without per-call timeout do not timeout", async () => {
       const endpoint = createMockEndpoint();
-      const client = createClient(endpoint, { defaultTimeout: Number.POSITIVE_INFINITY });
+      const client = createClient(endpoint, {
+        defaultTimeout: Number.POSITIVE_INFINITY,
+      });
 
       const promise = client.wait();
 
@@ -2592,7 +2719,11 @@ describe("client/proxy", () => {
       const promise = client.ping();
 
       // Error response with id: undefined
-      endpoint.receive({ jsonrpc: "2.0", error: { code: -32603, message: "Internal error" }, id: undefined });
+      endpoint.receive({
+        jsonrpc: "2.0",
+        error: { code: -32603, message: "Internal error" },
+        id: undefined,
+      });
 
       // Promise should still be pending
       const result = await Promise.race([
@@ -2675,7 +2806,7 @@ describe("client/proxy", () => {
         id: 1,
       });
 
-      const err = await promise.catch((e: unknown) => e) as RpcError;
+      const err = (await promise.catch((e: unknown) => e)) as RpcError;
       expect(err).toBeInstanceOf(RpcError);
       expect(err.data).toBeNull();
       // Verify it's explicitly null, not undefined
@@ -2693,7 +2824,7 @@ describe("client/proxy", () => {
         id: 1,
       });
 
-      const err = await promise.catch((e: unknown) => e) as RpcError;
+      const err = (await promise.catch((e: unknown) => e)) as RpcError;
       expect(err).toBeInstanceOf(RpcError);
       expect(err.data).toBe(0);
       // Verify it's explicitly 0, not undefined or null
@@ -2712,7 +2843,7 @@ describe("client/proxy", () => {
         id: 1,
       });
 
-      const err = await promise.catch((e: unknown) => e) as RpcError;
+      const err = (await promise.catch((e: unknown) => e)) as RpcError;
       expect(err).toBeInstanceOf(RpcError);
       expect(err.data).toBe("");
       // Verify it's explicitly empty string, not undefined or null
@@ -2731,7 +2862,7 @@ describe("client/proxy", () => {
         id: 1,
       });
 
-      const err = await promise.catch((e: unknown) => e) as RpcError;
+      const err = (await promise.catch((e: unknown) => e)) as RpcError;
       expect(err).toBeInstanceOf(RpcError);
       expect(err.data).toBe(false);
       expect(err.data).not.toBeUndefined();
@@ -2902,7 +3033,7 @@ describe("client/proxy", () => {
       const pSlow = client.slow({}, { timeout: 200 });
 
       // The fast one should timeout first
-      const errFast = await pFast.catch((e: unknown) => e) as FractalError;
+      const errFast = (await pFast.catch((e: unknown) => e)) as FractalError;
       const fastElapsed = performance.now() - start;
 
       expect(errFast).toBeInstanceOf(FractalError);
@@ -2913,7 +3044,7 @@ describe("client/proxy", () => {
 
       // The slow one should still be pending at this point (if fast resolved quickly enough)
       // Wait for slow to timeout too
-      const errSlow = await pSlow.catch((e: unknown) => e) as FractalError;
+      const errSlow = (await pSlow.catch((e: unknown) => e)) as FractalError;
       const slowElapsed = performance.now() - start;
 
       expect(errSlow).toBeInstanceOf(FractalError);
@@ -3129,9 +3260,16 @@ describe("client/proxy", () => {
       expect(result).toEqual(deepResult);
 
       // Verify specific deep paths to ensure faithful passthrough
-      expect((result as any).user.profile.settings.notifications.channels).toEqual(["general", "updates"]);
-      expect((result as any).user.profile.metadata.nested.deep.deeper.deepest).toBe("found-it");
-      expect((result as any).user.profile.metadata.tags[1]).toEqual({ key: "level", value: 42 });
+      expect(
+        (result as any).user.profile.settings.notifications.channels,
+      ).toEqual(["general", "updates"]);
+      expect(
+        (result as any).user.profile.metadata.nested.deep.deeper.deepest,
+      ).toBe("found-it");
+      expect((result as any).user.profile.metadata.tags[1]).toEqual({
+        key: "level",
+        value: 42,
+      });
       expect((result as any).nullField).toBeNull();
       expect((result as any).emptyArray).toEqual([]);
       expect((result as any).emptyObject).toEqual({});
@@ -3142,8 +3280,16 @@ describe("client/proxy", () => {
       const client = createClient(endpoint);
 
       const arrayResult = [
-        { id: 1, name: "Alice", roles: [{ name: "admin", permissions: ["read", "write"] }] },
-        { id: 2, name: "Bob", roles: [{ name: "user", permissions: ["read"] }] },
+        {
+          id: 1,
+          name: "Alice",
+          roles: [{ name: "admin", permissions: ["read", "write"] }],
+        },
+        {
+          id: 2,
+          name: "Bob",
+          roles: [{ name: "user", permissions: ["read"] }],
+        },
       ];
 
       const promise = client.users.list();
@@ -3163,7 +3309,10 @@ describe("client/proxy", () => {
 
       client.$notify.$notify.method({ data: "test" });
 
-      const sentMessage = endpoint.send.mock.calls[0]?.[0] as Record<string, unknown>;
+      const sentMessage = endpoint.send.mock.calls[0]?.[0] as Record<
+        string,
+        unknown
+      >;
       expect(sentMessage).toEqual({
         jsonrpc: "2.0",
         method: "$notify.method",
@@ -3179,7 +3328,10 @@ describe("client/proxy", () => {
 
       client.$notify.$notify.deep.path();
 
-      const sentMessage = endpoint.send.mock.calls[0]?.[0] as Record<string, unknown>;
+      const sentMessage = endpoint.send.mock.calls[0]?.[0] as Record<
+        string,
+        unknown
+      >;
       expect(sentMessage).toEqual({
         jsonrpc: "2.0",
         method: "$notify.deep.path",
@@ -3336,7 +3488,10 @@ describe("client/proxy", () => {
       const ns = client.user;
       const promise = ns();
 
-      const sentMessage = endpoint.send.mock.calls[0]?.[0] as Record<string, unknown>;
+      const sentMessage = endpoint.send.mock.calls[0]?.[0] as Record<
+        string,
+        unknown
+      >;
       expect(sentMessage.method).toBe("user");
       expect("params" in sentMessage).toBe(false);
 
@@ -3397,7 +3552,9 @@ describe("client/proxy", () => {
       const promise = client.ping();
 
       // Error response with NaN id — should be ignored
-      endpoint.receive(makeErrorResponse(-32603, "Internal error", Number.NaN as any));
+      endpoint.receive(
+        makeErrorResponse(-32603, "Internal error", Number.NaN as any),
+      );
 
       // Promise should still be pending
       const result = await Promise.race([
@@ -3415,7 +3572,9 @@ describe("client/proxy", () => {
       const endpoint = createMockEndpoint();
       createClient(endpoint);
 
-      expect(() => endpoint.receive(makeSuccessResponse("data", Number.NaN))).not.toThrow();
+      expect(() =>
+        endpoint.receive(makeSuccessResponse("data", Number.NaN)),
+      ).not.toThrow();
     });
   });
 
@@ -3429,7 +3588,9 @@ describe("client/proxy", () => {
       // Dispose using Symbol.dispose (not client.dispose())
       client[Symbol.dispose]();
 
-      expect(() => client.$notify.log.info({ msg: "hello" })).toThrow(FractalError);
+      expect(() => client.$notify.log.info({ msg: "hello" })).toThrow(
+        FractalError,
+      );
       try {
         client.$notify.log.info({ msg: "hello" });
         expect.unreachable("should have thrown");
@@ -3556,7 +3717,10 @@ describe("client/proxy", () => {
         params: { msg: "hello" },
       });
       // No id field (it's a notification)
-      const sentMessage = endpoint.send.mock.calls[0]?.[0] as Record<string, unknown>;
+      const sentMessage = endpoint.send.mock.calls[0]?.[0] as Record<
+        string,
+        unknown
+      >;
       expect("id" in sentMessage).toBe(false);
     });
 
@@ -3576,7 +3740,9 @@ describe("client/proxy", () => {
   describe("defaultTimeout: Infinity + timeout: 0 per-call", () => {
     test("client with defaultTimeout: Infinity, per-call timeout: 0 times out immediately with FractalError('TIMEOUT')", async () => {
       const endpoint = createMockEndpoint();
-      const client = createClient(endpoint, { defaultTimeout: Number.POSITIVE_INFINITY });
+      const client = createClient(endpoint, {
+        defaultTimeout: Number.POSITIVE_INFINITY,
+      });
 
       // defaultTimeout: Infinity means no timeout by default,
       // but per-call timeout: 0 should override and cause immediate timeout
@@ -3589,7 +3755,9 @@ describe("client/proxy", () => {
 
     test("client with defaultTimeout: Infinity, per-call timeout: 0 — late response is ignored", async () => {
       const endpoint = createMockEndpoint();
-      const client = createClient(endpoint, { defaultTimeout: Number.POSITIVE_INFINITY });
+      const client = createClient(endpoint, {
+        defaultTimeout: Number.POSITIVE_INFINITY,
+      });
 
       const promise = client.method({}, { timeout: 0 });
       await promise.catch(() => {});
@@ -3619,7 +3787,7 @@ describe("client/proxy", () => {
       // Per the spec: "error takes priority over result (spec violation handling)"
       // Even though result is present (and falsy), the error field takes precedence
       await expect(promise).rejects.toThrow(RpcError);
-      const err = await promise.catch((e: unknown) => e) as RpcError;
+      const err = (await promise.catch((e: unknown) => e)) as RpcError;
       expect(err).toBeInstanceOf(RpcError);
       expect(err.code).toBe(-32000);
       expect(err.message).toBe("Server error");
@@ -3639,7 +3807,7 @@ describe("client/proxy", () => {
       });
 
       await expect(promise).rejects.toThrow(RpcError);
-      const err = await promise.catch((e: unknown) => e) as RpcError;
+      const err = (await promise.catch((e: unknown) => e)) as RpcError;
       expect(err.code).toBe(-32603);
     });
 
@@ -3657,7 +3825,7 @@ describe("client/proxy", () => {
       });
 
       await expect(promise).rejects.toThrow(RpcError);
-      const err = await promise.catch((e: unknown) => e) as RpcError;
+      const err = (await promise.catch((e: unknown) => e)) as RpcError;
       expect(err.code).toBe(-32602);
     });
 
@@ -3675,7 +3843,7 @@ describe("client/proxy", () => {
       });
 
       await expect(promise).rejects.toThrow(RpcError);
-      const err = await promise.catch((e: unknown) => e) as RpcError;
+      const err = (await promise.catch((e: unknown) => e)) as RpcError;
       expect(err.code).toBe(-32601);
     });
   });
@@ -3728,9 +3896,11 @@ describe("client/proxy", () => {
       const rejectedPromise = Promise.reject(new Error("async failure"));
       rejectedPromise.catch(() => {}); // Prevent unhandled rejection in test runner
 
-      endpoint.send.mockImplementationOnce(() => {
-        return rejectedPromise;
-      }).mockImplementation(() => {});
+      endpoint.send
+        .mockImplementationOnce(() => {
+          return rejectedPromise;
+        })
+        .mockImplementation(() => {});
       const client = createClient(endpoint);
 
       const promise = client.ping();
@@ -3763,8 +3933,14 @@ describe("client/proxy", () => {
       client2.methodX();
 
       // Explicitly assert that both clients start from id=1
-      const sent1 = endpoint1.send.mock.calls[0]?.[0] as Record<string, unknown>;
-      const sent2 = endpoint2.send.mock.calls[0]?.[0] as Record<string, unknown>;
+      const sent1 = endpoint1.send.mock.calls[0]?.[0] as Record<
+        string,
+        unknown
+      >;
+      const sent2 = endpoint2.send.mock.calls[0]?.[0] as Record<
+        string,
+        unknown
+      >;
 
       expect(sent1.id).toBe(1);
       expect(sent2.id).toBe(1);
@@ -3773,8 +3949,14 @@ describe("client/proxy", () => {
       client1.methodB();
       client2.methodY();
 
-      const sent1b = endpoint1.send.mock.calls[1]?.[0] as Record<string, unknown>;
-      const sent2b = endpoint2.send.mock.calls[1]?.[0] as Record<string, unknown>;
+      const sent1b = endpoint1.send.mock.calls[1]?.[0] as Record<
+        string,
+        unknown
+      >;
+      const sent2b = endpoint2.send.mock.calls[1]?.[0] as Record<
+        string,
+        unknown
+      >;
 
       expect(sent1b.id).toBe(2);
       expect(sent2b.id).toBe(2);
@@ -3800,7 +3982,10 @@ describe("client/proxy", () => {
       client1.e();
 
       // Verify client1 is now at id=5
-      const lastSent1 = endpoint1.send.mock.calls[4]?.[0] as Record<string, unknown>;
+      const lastSent1 = endpoint1.send.mock.calls[4]?.[0] as Record<
+        string,
+        unknown
+      >;
       expect(lastSent1.id).toBe(5);
 
       // Now create client2 — its counter should start fresh at 1
@@ -3808,11 +3993,15 @@ describe("client/proxy", () => {
       const client2 = createClient(endpoint2);
       client2.first();
 
-      const sent2 = endpoint2.send.mock.calls[0]?.[0] as Record<string, unknown>;
+      const sent2 = endpoint2.send.mock.calls[0]?.[0] as Record<
+        string,
+        unknown
+      >;
       expect(sent2.id).toBe(1);
 
       // Clean up
-      for (let i = 1; i <= 5; i++) endpoint1.receive(makeSuccessResponse(null, i));
+      for (let i = 1; i <= 5; i++)
+        endpoint1.receive(makeSuccessResponse(null, i));
       endpoint2.receive(makeSuccessResponse(null, 1));
     });
   });
@@ -3822,7 +4011,9 @@ describe("client/proxy", () => {
   describe("defaultTimeout as non-number type throws TypeError", () => {
     test('createClient(endpoint, { defaultTimeout: "100" as any }) throws TypeError', () => {
       const endpoint = createMockEndpoint();
-      expect(() => createClient(endpoint, { defaultTimeout: "100" as any })).toThrow(TypeError);
+      expect(() =>
+        createClient(endpoint, { defaultTimeout: "100" as any }),
+      ).toThrow(TypeError);
     });
   });
 
@@ -3832,7 +4023,9 @@ describe("client/proxy", () => {
     test('client.method({}, { timeout: "100" as any }) throws TypeError', () => {
       const endpoint = createMockEndpoint();
       const client = createClient(endpoint);
-      expect(() => client.method({}, { timeout: "100" as any })).toThrow(TypeError);
+      expect(() => client.method({}, { timeout: "100" as any })).toThrow(
+        TypeError,
+      );
     });
   });
 

@@ -9,7 +9,11 @@
     "type": "git",
     "url": "git+https://github.com/LiCHT-77/fractal.git"
   },
-  "keywords": ["json-rpc", "rpc", "typescript"],
+  "keywords": [
+    "json-rpc",
+    "rpc",
+    "typescript"
+  ],
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -28,7 +32,11 @@
       "import": "./dist/client/index.js"
     }
   },
-  "files": ["dist", "LICENSE", "README.md"],
+  "files": [
+    "dist",
+    "LICENSE",
+    "README.md"
+  ],
   "scripts": {
     "build": "rm -rf dist && bun run build:js && bun run build:types",
     "build:js": "bun build src/index.ts src/endpoint/index.ts src/adapter/index.ts src/client/index.ts --outdir dist --root src --splitting --format esm --target node",

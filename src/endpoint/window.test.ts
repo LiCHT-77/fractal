@@ -1,5 +1,5 @@
-import { windowEndpoint } from "./window.ts";
 import { createMockWindow } from "../test-helpers.ts";
+import { windowEndpoint } from "./window.ts";
 
 describe("endpoint/window", () => {
   // We need a "listener" window (simulating globalThis) that the endpoint listens on.
@@ -10,7 +10,10 @@ describe("endpoint/window", () => {
   test("send() calls target.postMessage with origin", () => {
     const target = createMockWindow();
     const listener = createMockWindow();
-    const endpoint = windowEndpoint(target as any, { origin: "https://example.com", listener: listener as any });
+    const endpoint = windowEndpoint(target as any, {
+      origin: "https://example.com",
+      listener: listener as any,
+    });
 
     endpoint.send({ jsonrpc: "2.0", method: "ping", id: 1 });
     expect(target.postMessage).toHaveBeenCalledWith(
@@ -22,7 +25,10 @@ describe("endpoint/window", () => {
   test("send() uses '*' as targetOrigin when origin is '*'", () => {
     const target = createMockWindow();
     const listener = createMockWindow();
-    const endpoint = windowEndpoint(target as any, { origin: "*", listener: listener as any });
+    const endpoint = windowEndpoint(target as any, {
+      origin: "*",
+      listener: listener as any,
+    });
 
     endpoint.send({ data: "test" });
     expect(target.postMessage).toHaveBeenCalledWith({ data: "test" }, "*");
@@ -31,7 +37,10 @@ describe("endpoint/window", () => {
   test("send() uses configured origin as targetOrigin", () => {
     const target = createMockWindow();
     const listener = createMockWindow();
-    const endpoint = windowEndpoint(target as any, { origin: "https://app.example.com", listener: listener as any });
+    const endpoint = windowEndpoint(target as any, {
+      origin: "https://app.example.com",
+      listener: listener as any,
+    });
 
     endpoint.send({ jsonrpc: "2.0", method: "test", id: 1 });
     expect(target.postMessage).toHaveBeenCalledWith(
@@ -43,17 +52,26 @@ describe("endpoint/window", () => {
   test("onMessage registers a listener", () => {
     const target = createMockWindow();
     const listener = createMockWindow();
-    const endpoint = windowEndpoint(target as any, { origin: "https://example.com", listener: listener as any });
+    const endpoint = windowEndpoint(target as any, {
+      origin: "https://example.com",
+      listener: listener as any,
+    });
 
     const handler = vi.fn();
     endpoint.onMessage(handler);
-    expect(listener.addEventListener).toHaveBeenCalledWith("message", expect.any(Function));
+    expect(listener.addEventListener).toHaveBeenCalledWith(
+      "message",
+      expect.any(Function),
+    );
   });
 
   test("onMessage filters messages by origin", () => {
     const target = createMockWindow();
     const listener = createMockWindow();
-    const endpoint = windowEndpoint(target as any, { origin: "https://trusted.com", listener: listener as any });
+    const endpoint = windowEndpoint(target as any, {
+      origin: "https://trusted.com",
+      listener: listener as any,
+    });
 
     const handler = vi.fn();
     endpoint.onMessage(handler);
@@ -70,7 +88,10 @@ describe("endpoint/window", () => {
     const target = createMockWindow();
     const listener = createMockWindow();
     const otherWindow = createMockWindow();
-    const endpoint = windowEndpoint(target as any, { origin: "https://example.com", listener: listener as any });
+    const endpoint = windowEndpoint(target as any, {
+      origin: "https://example.com",
+      listener: listener as any,
+    });
 
     const handler = vi.fn();
     endpoint.onMessage(handler);
@@ -86,7 +107,10 @@ describe("endpoint/window", () => {
   test("onMessage ignores non-JSON-RPC messages", () => {
     const target = createMockWindow();
     const listener = createMockWindow();
-    const endpoint = windowEndpoint(target as any, { origin: "*", listener: listener as any });
+    const endpoint = windowEndpoint(target as any, {
+      origin: "*",
+      listener: listener as any,
+    });
 
     const handler = vi.fn();
     endpoint.onMessage(handler);
@@ -102,7 +126,10 @@ describe("endpoint/window", () => {
   test("origin '*' disables origin filtering", () => {
     const target = createMockWindow();
     const listener = createMockWindow();
-    const endpoint = windowEndpoint(target as any, { origin: "*", listener: listener as any });
+    const endpoint = windowEndpoint(target as any, {
+      origin: "*",
+      listener: listener as any,
+    });
 
     const handler = vi.fn();
     endpoint.onMessage(handler);
@@ -119,7 +146,10 @@ describe("endpoint/window", () => {
     const target = createMockWindow();
     const listener = createMockWindow();
     const otherWindow = createMockWindow();
-    const endpoint = windowEndpoint(target as any, { origin: "*", listener: listener as any });
+    const endpoint = windowEndpoint(target as any, {
+      origin: "*",
+      listener: listener as any,
+    });
 
     const handler = vi.fn();
     endpoint.onMessage(handler);
@@ -135,7 +165,10 @@ describe("endpoint/window", () => {
   test("dispose removes listener", () => {
     const target = createMockWindow();
     const listener = createMockWindow();
-    const endpoint = windowEndpoint(target as any, { origin: "*", listener: listener as any });
+    const endpoint = windowEndpoint(target as any, {
+      origin: "*",
+      listener: listener as any,
+    });
 
     const handler = vi.fn();
     const dispose = endpoint.onMessage(handler);
@@ -152,7 +185,10 @@ describe("endpoint/window", () => {
   test("multiple handlers: dispose one, other still works", () => {
     const target = createMockWindow();
     const listener = createMockWindow();
-    const endpoint = windowEndpoint(target as any, { origin: "*", listener: listener as any });
+    const endpoint = windowEndpoint(target as any, {
+      origin: "*",
+      listener: listener as any,
+    });
 
     const h1 = vi.fn();
     const h2 = vi.fn();
@@ -172,33 +208,48 @@ describe("endpoint/window", () => {
   test("passes MessageEvent to handler", () => {
     const target = createMockWindow();
     const listener = createMockWindow();
-    const endpoint = windowEndpoint(target as any, { origin: "*", listener: listener as any });
+    const endpoint = windowEndpoint(target as any, {
+      origin: "*",
+      listener: listener as any,
+    });
 
     const handler = vi.fn();
     endpoint.onMessage(handler);
 
     const msg = { jsonrpc: "2.0", method: "ping", id: 1 };
-    listener.dispatchMessage(msg, { origin: "https://example.com", source: target });
+    listener.dispatchMessage(msg, {
+      origin: "https://example.com",
+      source: target,
+    });
     expect(handler).toHaveBeenCalledWith(msg, expect.any(Object));
   });
 
   test("handler receives valid JSON-RPC message with correct source/origin", () => {
     const target = createMockWindow();
     const listener = createMockWindow();
-    const endpoint = windowEndpoint(target as any, { origin: "https://example.com", listener: listener as any });
+    const endpoint = windowEndpoint(target as any, {
+      origin: "https://example.com",
+      listener: listener as any,
+    });
 
     const handler = vi.fn();
     endpoint.onMessage(handler);
 
     const msg = { jsonrpc: "2.0", method: "ping", id: 1 };
-    listener.dispatchMessage(msg, { origin: "https://example.com", source: target });
+    listener.dispatchMessage(msg, {
+      origin: "https://example.com",
+      source: target,
+    });
     expect(handler).toHaveBeenCalledWith(msg, expect.any(Object));
   });
 
   test("send() propagates postMessage exceptions to the caller", () => {
     const target = createMockWindow();
     const listener = createMockWindow();
-    const endpoint = windowEndpoint(target as any, { origin: "*", listener: listener as any });
+    const endpoint = windowEndpoint(target as any, {
+      origin: "*",
+      listener: listener as any,
+    });
 
     target.postMessage.mockImplementation(() => {
       throw new DOMException("Failed to execute 'postMessage'");
@@ -212,7 +263,10 @@ describe("endpoint/window", () => {
   test("messages with null event.source are filtered out", () => {
     const target = createMockWindow();
     const listener = createMockWindow();
-    const endpoint = windowEndpoint(target as any, { origin: "*", listener: listener as any });
+    const endpoint = windowEndpoint(target as any, {
+      origin: "*",
+      listener: listener as any,
+    });
 
     const handler = vi.fn();
     endpoint.onMessage(handler);
@@ -227,7 +281,10 @@ describe("endpoint/window", () => {
   test("messages with undefined event.source are filtered out", () => {
     const target = createMockWindow();
     const listener = createMockWindow();
-    const endpoint = windowEndpoint(target as any, { origin: "*", listener: listener as any });
+    const endpoint = windowEndpoint(target as any, {
+      origin: "*",
+      listener: listener as any,
+    });
 
     const handler = vi.fn();
     endpoint.onMessage(handler);
@@ -242,7 +299,10 @@ describe("endpoint/window", () => {
   test("multiple onMessage calls are additive (addEventListener semantics)", () => {
     const target = createMockWindow();
     const listener = createMockWindow();
-    const endpoint = windowEndpoint(target as any, { origin: "*", listener: listener as any });
+    const endpoint = windowEndpoint(target as any, {
+      origin: "*",
+      listener: listener as any,
+    });
 
     const h1 = vi.fn();
     const h2 = vi.fn();
@@ -250,7 +310,10 @@ describe("endpoint/window", () => {
     endpoint.onMessage(h2);
 
     const msg = { jsonrpc: "2.0", method: "ping", id: 1 };
-    listener.dispatchMessage(msg, { origin: "https://example.com", source: target });
+    listener.dispatchMessage(msg, {
+      origin: "https://example.com",
+      source: target,
+    });
     expect(h1).toHaveBeenCalledWith(msg, expect.any(Object));
     expect(h2).toHaveBeenCalledWith(msg, expect.any(Object));
   });
@@ -258,7 +321,10 @@ describe("endpoint/window", () => {
   test("handler exception does not crash other handlers", () => {
     const target = createMockWindow();
     const listener = createMockWindow();
-    const endpoint = windowEndpoint(target as any, { origin: "*", listener: listener as any });
+    const endpoint = windowEndpoint(target as any, {
+      origin: "*",
+      listener: listener as any,
+    });
 
     const h1 = vi.fn(() => {
       throw new Error("handler 1 exploded");
@@ -278,9 +344,13 @@ describe("endpoint/window", () => {
   test("handler exception does not break the endpoint (new messages still processed)", () => {
     const target = createMockWindow();
     const listener = createMockWindow();
-    const endpoint = windowEndpoint(target as any, { origin: "*", listener: listener as any });
+    const endpoint = windowEndpoint(target as any, {
+      origin: "*",
+      listener: listener as any,
+    });
 
-    const handler = vi.fn()
+    const handler = vi
+      .fn()
       .mockImplementationOnce(() => {
         throw new Error("first call explodes");
       })
@@ -306,7 +376,10 @@ describe("endpoint/window", () => {
     const target = createMockWindow();
     const listener = createMockWindow();
     const otherIframe = createMockWindow();
-    const endpoint = windowEndpoint(target as any, { origin: "https://example.com", listener: listener as any });
+    const endpoint = windowEndpoint(target as any, {
+      origin: "https://example.com",
+      listener: listener as any,
+    });
 
     const handler = vi.fn();
     endpoint.onMessage(handler);
@@ -329,7 +402,10 @@ describe("endpoint/window", () => {
   test("jsonrpc: 2.0 (number) → filtered out", () => {
     const target = createMockWindow();
     const listener = createMockWindow();
-    const endpoint = windowEndpoint(target as any, { origin: "*", listener: listener as any });
+    const endpoint = windowEndpoint(target as any, {
+      origin: "*",
+      listener: listener as any,
+    });
 
     const handler = vi.fn();
     endpoint.onMessage(handler);
@@ -345,37 +421,46 @@ describe("endpoint/window", () => {
   test("null message data → filtered out", () => {
     const target = createMockWindow();
     const listener = createMockWindow();
-    const endpoint = windowEndpoint(target as any, { origin: "*", listener: listener as any });
+    const endpoint = windowEndpoint(target as any, {
+      origin: "*",
+      listener: listener as any,
+    });
 
     const handler = vi.fn();
     endpoint.onMessage(handler);
 
-    listener.dispatchMessage(
-      null,
-      { origin: "https://example.com", source: target },
-    );
+    listener.dispatchMessage(null, {
+      origin: "https://example.com",
+      source: target,
+    });
     expect(handler).not.toHaveBeenCalled();
   });
 
   test("undefined message data → filtered out", () => {
     const target = createMockWindow();
     const listener = createMockWindow();
-    const endpoint = windowEndpoint(target as any, { origin: "*", listener: listener as any });
+    const endpoint = windowEndpoint(target as any, {
+      origin: "*",
+      listener: listener as any,
+    });
 
     const handler = vi.fn();
     endpoint.onMessage(handler);
 
-    listener.dispatchMessage(
-      undefined,
-      { origin: "https://example.com", source: target },
-    );
+    listener.dispatchMessage(undefined, {
+      origin: "https://example.com",
+      source: target,
+    });
     expect(handler).not.toHaveBeenCalled();
   });
 
   test("empty object {} message data → filtered out (handler not called)", () => {
     const target = createMockWindow();
     const listener = createMockWindow();
-    const endpoint = windowEndpoint(target as any, { origin: "*", listener: listener as any });
+    const endpoint = windowEndpoint(target as any, {
+      origin: "*",
+      listener: listener as any,
+    });
 
     const handler = vi.fn();
     endpoint.onMessage(handler);
@@ -391,7 +476,10 @@ describe("endpoint/window", () => {
   test("dispose → re-register new handler → new handler receives messages", () => {
     const target = createMockWindow();
     const listener = createMockWindow();
-    const endpoint = windowEndpoint(target as any, { origin: "*", listener: listener as any });
+    const endpoint = windowEndpoint(target as any, {
+      origin: "*",
+      listener: listener as any,
+    });
 
     const oldHandler = vi.fn();
     const dispose = endpoint.onMessage(oldHandler);
@@ -402,7 +490,10 @@ describe("endpoint/window", () => {
     endpoint.onMessage(newHandler);
 
     const msg = { jsonrpc: "2.0", method: "ping", id: 1 };
-    listener.dispatchMessage(msg, { origin: "https://example.com", source: target });
+    listener.dispatchMessage(msg, {
+      origin: "https://example.com",
+      source: target,
+    });
 
     // Old handler should not be called (was disposed)
     expect(oldHandler).not.toHaveBeenCalled();
@@ -413,7 +504,10 @@ describe("endpoint/window", () => {
   test("dispose is idempotent (calling multiple times does not throw)", () => {
     const target = createMockWindow();
     const listener = createMockWindow();
-    const endpoint = windowEndpoint(target as any, { origin: "*", listener: listener as any });
+    const endpoint = windowEndpoint(target as any, {
+      origin: "*",
+      listener: listener as any,
+    });
 
     const handler = vi.fn();
     const dispose = endpoint.onMessage(handler);
@@ -451,7 +545,10 @@ describe("endpoint/window", () => {
       const dispose = endpoint.onMessage(handler);
 
       // addEventListener が globalThis(=mockListener) 経由で呼ばれた
-      expect(mockListener.addEventListener).toHaveBeenCalledWith("message", expect.any(Function));
+      expect(mockListener.addEventListener).toHaveBeenCalledWith(
+        "message",
+        expect.any(Function),
+      );
 
       // 実際にメッセージをディスパッチしてハンドラに届くことを検証
       mockListener.dispatchMessage(
@@ -462,7 +559,10 @@ describe("endpoint/window", () => {
 
       // dispose で removeEventListener が呼ばれる
       dispose();
-      expect(mockListener.removeEventListener).toHaveBeenCalledWith("message", expect.any(Function));
+      expect(mockListener.removeEventListener).toHaveBeenCalledWith(
+        "message",
+        expect.any(Function),
+      );
     } finally {
       globalThis.addEventListener = origAdd;
       globalThis.removeEventListener = origRemove;
@@ -472,7 +572,10 @@ describe("endpoint/window", () => {
   test("origin case sensitivity: mixed-case origin does NOT match lowercase", () => {
     const target = createMockWindow();
     const listener = createMockWindow();
-    const endpoint = windowEndpoint(target as any, { origin: "https://Example.COM", listener: listener as any });
+    const endpoint = windowEndpoint(target as any, {
+      origin: "https://Example.COM",
+      listener: listener as any,
+    });
 
     const handler = vi.fn();
     endpoint.onMessage(handler);
@@ -495,7 +598,10 @@ describe("endpoint/window", () => {
   test("similar origins distinction: port difference is a different origin", () => {
     const target = createMockWindow();
     const listener = createMockWindow();
-    const endpoint = windowEndpoint(target as any, { origin: "https://example.com", listener: listener as any });
+    const endpoint = windowEndpoint(target as any, {
+      origin: "https://example.com",
+      listener: listener as any,
+    });
 
     const handler = vi.fn();
     endpoint.onMessage(handler);
@@ -519,7 +625,10 @@ describe("endpoint/window", () => {
     const targetIframe = createMockWindow();
     const otherIframe = createMockWindow();
     const listener = createMockWindow();
-    const endpoint = windowEndpoint(targetIframe as any, { origin: "https://example.com", listener: listener as any });
+    const endpoint = windowEndpoint(targetIframe as any, {
+      origin: "https://example.com",
+      listener: listener as any,
+    });
 
     const handler = vi.fn();
     endpoint.onMessage(handler);
@@ -545,11 +654,16 @@ describe("endpoint/window", () => {
   test("send() with structured clone incompatible data: error propagates", () => {
     const target = createMockWindow();
     const listener = createMockWindow();
-    const endpoint = windowEndpoint(target as any, { origin: "*", listener: listener as any });
+    const endpoint = windowEndpoint(target as any, {
+      origin: "*",
+      listener: listener as any,
+    });
 
     // Simulate postMessage throwing a DOMException for non-cloneable data
     target.postMessage.mockImplementation(() => {
-      throw new DOMException("Failed to execute 'postMessage': function could not be cloned.");
+      throw new DOMException(
+        "Failed to execute 'postMessage': function could not be cloned.",
+      );
     });
 
     const nonCloneable = { fn: () => {}, sym: Symbol("test") };
@@ -561,13 +675,19 @@ describe("endpoint/window", () => {
   test("MessageEvent passed to handler has correct origin, source, and data properties", () => {
     const target = createMockWindow();
     const listener = createMockWindow();
-    const endpoint = windowEndpoint(target as any, { origin: "https://example.com", listener: listener as any });
+    const endpoint = windowEndpoint(target as any, {
+      origin: "https://example.com",
+      listener: listener as any,
+    });
 
     const handler = vi.fn();
     endpoint.onMessage(handler);
 
     const msg = { jsonrpc: "2.0", method: "ping", id: 1 };
-    listener.dispatchMessage(msg, { origin: "https://example.com", source: target });
+    listener.dispatchMessage(msg, {
+      origin: "https://example.com",
+      source: target,
+    });
 
     expect(handler).toHaveBeenCalledTimes(1);
     const event = handler.mock.calls[0][1];
@@ -579,7 +699,10 @@ describe("endpoint/window", () => {
   test("multiple onMessage handlers execute in registration order (FIFO)", () => {
     const target = createMockWindow();
     const listener = createMockWindow();
-    const endpoint = windowEndpoint(target as any, { origin: "*", listener: listener as any });
+    const endpoint = windowEndpoint(target as any, {
+      origin: "*",
+      listener: listener as any,
+    });
 
     const callOrder: number[] = [];
     const h1 = vi.fn(() => callOrder.push(1));
@@ -600,7 +723,10 @@ describe("endpoint/window", () => {
     const target = createMockWindow();
     const listener = createMockWindow();
     const otherWindow = createMockWindow();
-    const endpoint = windowEndpoint(target as any, { origin: "*", listener: listener as any });
+    const endpoint = windowEndpoint(target as any, {
+      origin: "*",
+      listener: listener as any,
+    });
 
     const handler = vi.fn();
     endpoint.onMessage(handler);
@@ -620,7 +746,10 @@ describe("endpoint/window", () => {
     expect(handler).toHaveBeenCalledTimes(1);
     expect(handler).toHaveBeenCalledWith(
       { jsonrpc: "2.0", method: "ping", id: 2 },
-      expect.objectContaining({ source: target, origin: "https://completely-different.com" }),
+      expect.objectContaining({
+        source: target,
+        origin: "https://completely-different.com",
+      }),
     );
   });
 
@@ -629,15 +758,18 @@ describe("endpoint/window", () => {
   test("batch request (array of JSON-RPC messages) is ignored", () => {
     const target = createMockWindow();
     const listener = createMockWindow();
-    const endpoint = windowEndpoint(target as any, { origin: "*", listener: listener as any });
+    const endpoint = windowEndpoint(target as any, {
+      origin: "*",
+      listener: listener as any,
+    });
 
     const handler = vi.fn();
     endpoint.onMessage(handler);
 
-    listener.dispatchMessage(
-      [{ jsonrpc: "2.0", method: "ping", id: 1 }],
-      { origin: "https://example.com", source: target },
-    );
+    listener.dispatchMessage([{ jsonrpc: "2.0", method: "ping", id: 1 }], {
+      origin: "https://example.com",
+      source: target,
+    });
     expect(handler).not.toHaveBeenCalled();
   });
 
@@ -646,48 +778,72 @@ describe("endpoint/window", () => {
   test("string primitive message is ignored", () => {
     const target = createMockWindow();
     const listener = createMockWindow();
-    const endpoint = windowEndpoint(target as any, { origin: "*", listener: listener as any });
+    const endpoint = windowEndpoint(target as any, {
+      origin: "*",
+      listener: listener as any,
+    });
 
     const handler = vi.fn();
     endpoint.onMessage(handler);
 
-    listener.dispatchMessage("hello", { origin: "https://example.com", source: target });
+    listener.dispatchMessage("hello", {
+      origin: "https://example.com",
+      source: target,
+    });
     expect(handler).not.toHaveBeenCalled();
   });
 
   test("number primitive message is ignored", () => {
     const target = createMockWindow();
     const listener = createMockWindow();
-    const endpoint = windowEndpoint(target as any, { origin: "*", listener: listener as any });
+    const endpoint = windowEndpoint(target as any, {
+      origin: "*",
+      listener: listener as any,
+    });
 
     const handler = vi.fn();
     endpoint.onMessage(handler);
 
-    listener.dispatchMessage(42, { origin: "https://example.com", source: target });
+    listener.dispatchMessage(42, {
+      origin: "https://example.com",
+      source: target,
+    });
     expect(handler).not.toHaveBeenCalled();
   });
 
   test("boolean true message is ignored", () => {
     const target = createMockWindow();
     const listener = createMockWindow();
-    const endpoint = windowEndpoint(target as any, { origin: "*", listener: listener as any });
+    const endpoint = windowEndpoint(target as any, {
+      origin: "*",
+      listener: listener as any,
+    });
 
     const handler = vi.fn();
     endpoint.onMessage(handler);
 
-    listener.dispatchMessage(true, { origin: "https://example.com", source: target });
+    listener.dispatchMessage(true, {
+      origin: "https://example.com",
+      source: target,
+    });
     expect(handler).not.toHaveBeenCalled();
   });
 
   test("boolean false message is ignored", () => {
     const target = createMockWindow();
     const listener = createMockWindow();
-    const endpoint = windowEndpoint(target as any, { origin: "*", listener: listener as any });
+    const endpoint = windowEndpoint(target as any, {
+      origin: "*",
+      listener: listener as any,
+    });
 
     const handler = vi.fn();
     endpoint.onMessage(handler);
 
-    listener.dispatchMessage(false, { origin: "https://example.com", source: target });
+    listener.dispatchMessage(false, {
+      origin: "https://example.com",
+      source: target,
+    });
     expect(handler).not.toHaveBeenCalled();
   });
 
@@ -698,7 +854,10 @@ describe("endpoint/window", () => {
   test("async handler that rejects: endpoint continues processing (rejection caught externally)", async () => {
     const target = createMockWindow();
     const listener = createMockWindow();
-    const endpoint = windowEndpoint(target as any, { origin: "*", listener: listener as any });
+    const endpoint = windowEndpoint(target as any, {
+      origin: "*",
+      listener: listener as any,
+    });
 
     // Use a deferred promise to simulate an async handler that eventually rejects,
     // but we catch the rejection ourselves so it doesn't become unhandled.
@@ -709,7 +868,8 @@ describe("endpoint/window", () => {
     // Attach a catch so the rejection is handled
     const caughtRejection = rejectedPromise.catch((e) => e);
 
-    const handler = vi.fn()
+    const handler = vi
+      .fn()
       .mockImplementationOnce(() => rejectedPromise)
       .mockImplementation(() => {});
     endpoint.onMessage(handler);
@@ -737,7 +897,10 @@ describe("endpoint/window", () => {
   test("async handler that rejects does not prevent other handlers from executing", async () => {
     const target = createMockWindow();
     const listener = createMockWindow();
-    const endpoint = windowEndpoint(target as any, { origin: "*", listener: listener as any });
+    const endpoint = windowEndpoint(target as any, {
+      origin: "*",
+      listener: listener as any,
+    });
 
     // Create a manually-controlled rejected promise, with a catch handler so it's not unhandled.
     let rejectFn!: (reason: Error) => void;
@@ -775,7 +938,10 @@ describe("endpoint/window", () => {
     listener.addEventListener.mockImplementation(() => {
       throw new Error("addEventListener failed");
     });
-    const endpoint = windowEndpoint(target as any, { origin: "*", listener: listener as any });
+    const endpoint = windowEndpoint(target as any, {
+      origin: "*",
+      listener: listener as any,
+    });
 
     const handler = vi.fn();
     expect(() => {
@@ -788,7 +954,10 @@ describe("endpoint/window", () => {
   test("event.source === 0 (falsy) is filtered out", () => {
     const target = createMockWindow();
     const listener = createMockWindow();
-    const endpoint = windowEndpoint(target as any, { origin: "*", listener: listener as any });
+    const endpoint = windowEndpoint(target as any, {
+      origin: "*",
+      listener: listener as any,
+    });
 
     const handler = vi.fn();
     endpoint.onMessage(handler);
@@ -803,7 +972,10 @@ describe("endpoint/window", () => {
   test("event.source === false (falsy) is filtered out", () => {
     const target = createMockWindow();
     const listener = createMockWindow();
-    const endpoint = windowEndpoint(target as any, { origin: "*", listener: listener as any });
+    const endpoint = windowEndpoint(target as any, {
+      origin: "*",
+      listener: listener as any,
+    });
 
     const handler = vi.fn();
     endpoint.onMessage(handler);
@@ -818,7 +990,10 @@ describe("endpoint/window", () => {
   test("event.source === '' (empty string, falsy) is filtered out", () => {
     const target = createMockWindow();
     const listener = createMockWindow();
-    const endpoint = windowEndpoint(target as any, { origin: "*", listener: listener as any });
+    const endpoint = windowEndpoint(target as any, {
+      origin: "*",
+      listener: listener as any,
+    });
 
     const handler = vi.fn();
     endpoint.onMessage(handler);
@@ -835,13 +1010,19 @@ describe("endpoint/window", () => {
   test("JSON-RPC Response message is passed to handler (endpoint does not distinguish Request/Response)", () => {
     const target = createMockWindow();
     const listener = createMockWindow();
-    const endpoint = windowEndpoint(target as any, { origin: "*", listener: listener as any });
+    const endpoint = windowEndpoint(target as any, {
+      origin: "*",
+      listener: listener as any,
+    });
 
     const handler = vi.fn();
     endpoint.onMessage(handler);
 
     const response = { jsonrpc: "2.0", result: "ok", id: 1 };
-    listener.dispatchMessage(response, { origin: "https://example.com", source: target });
+    listener.dispatchMessage(response, {
+      origin: "https://example.com",
+      source: target,
+    });
     expect(handler).toHaveBeenCalledWith(response, expect.any(Object));
   });
 
@@ -850,14 +1031,20 @@ describe("endpoint/window", () => {
   test("jsonrpc: '2.0' only message (no method, no result, no error) passes through to handler", () => {
     const target = createMockWindow();
     const listener = createMockWindow();
-    const endpoint = windowEndpoint(target as any, { origin: "*", listener: listener as any });
+    const endpoint = windowEndpoint(target as any, {
+      origin: "*",
+      listener: listener as any,
+    });
 
     const handler = vi.fn();
     endpoint.onMessage(handler);
 
     // Endpoint layer only checks jsonrpc === "2.0"; it does not require method/result/error
     const msg = { jsonrpc: "2.0" };
-    listener.dispatchMessage(msg, { origin: "https://example.com", source: target });
+    listener.dispatchMessage(msg, {
+      origin: "https://example.com",
+      source: target,
+    });
     expect(handler).toHaveBeenCalledWith(msg, expect.any(Object));
   });
 
@@ -865,7 +1052,10 @@ describe("endpoint/window", () => {
     const target = createMockWindow();
     const listener = createMockWindow();
     // Endpoint configured with https
-    const endpoint = windowEndpoint(target as any, { origin: "https://example.com", listener: listener as any });
+    const endpoint = windowEndpoint(target as any, {
+      origin: "https://example.com",
+      listener: listener as any,
+    });
 
     const handler = vi.fn();
     endpoint.onMessage(handler);
@@ -890,8 +1080,14 @@ describe("endpoint/window", () => {
     const target2 = createMockWindow();
     const listener = createMockWindow();
 
-    const endpoint1 = windowEndpoint(target1 as any, { origin: "*", listener: listener as any });
-    const endpoint2 = windowEndpoint(target2 as any, { origin: "*", listener: listener as any });
+    const endpoint1 = windowEndpoint(target1 as any, {
+      origin: "*",
+      listener: listener as any,
+    });
+    const endpoint2 = windowEndpoint(target2 as any, {
+      origin: "*",
+      listener: listener as any,
+    });
 
     const handler1 = vi.fn();
     const handler2 = vi.fn();

@@ -26,7 +26,10 @@ export function makeNotification(
   return msg;
 }
 
-export function makeSuccessResponse(result: unknown, id: string | number | null) {
+export function makeSuccessResponse(
+  result: unknown,
+  id: string | number | null,
+) {
   return { jsonrpc: "2.0" as const, result, id };
 }
 
@@ -98,16 +101,20 @@ export function createMockWindow(): MockWindow {
 
   const postMessage = vi.fn<(message: unknown, targetOrigin: string) => void>();
 
-  const addEventListener = vi.fn((type: string, handler: (event: MessageEvent) => void) => {
-    if (type === "message") listeners.push(handler);
-  });
+  const addEventListener = vi.fn(
+    (type: string, handler: (event: MessageEvent) => void) => {
+      if (type === "message") listeners.push(handler);
+    },
+  );
 
-  const removeEventListener = vi.fn((type: string, handler: (event: MessageEvent) => void) => {
-    if (type === "message") {
-      const idx = listeners.indexOf(handler);
-      if (idx !== -1) listeners.splice(idx, 1);
-    }
-  });
+  const removeEventListener = vi.fn(
+    (type: string, handler: (event: MessageEvent) => void) => {
+      if (type === "message") {
+        const idx = listeners.indexOf(handler);
+        if (idx !== -1) listeners.splice(idx, 1);
+      }
+    },
+  );
 
   const dispatchMessage = (
     data: unknown,
@@ -123,7 +130,13 @@ export function createMockWindow(): MockWindow {
     }
   };
 
-  return { postMessage, addEventListener, removeEventListener, dispatchMessage, _listeners: listeners };
+  return {
+    postMessage,
+    addEventListener,
+    removeEventListener,
+    dispatchMessage,
+    _listeners: listeners,
+  };
 }
 
 // ─── MessagePort Mock ───
@@ -146,16 +159,20 @@ export function createMockMessagePort(): MockMessagePort {
   const start = vi.fn();
   const close = vi.fn();
 
-  const addEventListener = vi.fn((type: string, handler: (event: MessageEvent) => void) => {
-    if (type === "message") listeners.push(handler);
-  });
+  const addEventListener = vi.fn(
+    (type: string, handler: (event: MessageEvent) => void) => {
+      if (type === "message") listeners.push(handler);
+    },
+  );
 
-  const removeEventListener = vi.fn((type: string, handler: (event: MessageEvent) => void) => {
-    if (type === "message") {
-      const idx = listeners.indexOf(handler);
-      if (idx !== -1) listeners.splice(idx, 1);
-    }
-  });
+  const removeEventListener = vi.fn(
+    (type: string, handler: (event: MessageEvent) => void) => {
+      if (type === "message") {
+        const idx = listeners.indexOf(handler);
+        if (idx !== -1) listeners.splice(idx, 1);
+      }
+    },
+  );
 
   const dispatchMessage = (data: unknown) => {
     const event = { data } as MessageEvent;
@@ -164,7 +181,15 @@ export function createMockMessagePort(): MockMessagePort {
     }
   };
 
-  return { postMessage, addEventListener, removeEventListener, start, close, dispatchMessage, _listeners: listeners };
+  return {
+    postMessage,
+    addEventListener,
+    removeEventListener,
+    start,
+    close,
+    dispatchMessage,
+    _listeners: listeners,
+  };
 }
 
 // ─── Worker Mock ───
@@ -183,16 +208,20 @@ export function createMockWorker(): MockWorker {
 
   const postMessage = vi.fn<(message: unknown) => void>();
 
-  const addEventListener = vi.fn((type: string, handler: (event: MessageEvent) => void) => {
-    if (type === "message") listeners.push(handler);
-  });
+  const addEventListener = vi.fn(
+    (type: string, handler: (event: MessageEvent) => void) => {
+      if (type === "message") listeners.push(handler);
+    },
+  );
 
-  const removeEventListener = vi.fn((type: string, handler: (event: MessageEvent) => void) => {
-    if (type === "message") {
-      const idx = listeners.indexOf(handler);
-      if (idx !== -1) listeners.splice(idx, 1);
-    }
-  });
+  const removeEventListener = vi.fn(
+    (type: string, handler: (event: MessageEvent) => void) => {
+      if (type === "message") {
+        const idx = listeners.indexOf(handler);
+        if (idx !== -1) listeners.splice(idx, 1);
+      }
+    },
+  );
 
   const dispatchMessage = (data: unknown) => {
     const event = { data } as MessageEvent;
@@ -201,13 +230,21 @@ export function createMockWorker(): MockWorker {
     }
   };
 
-  return { postMessage, addEventListener, removeEventListener, dispatchMessage, _listeners: listeners };
+  return {
+    postMessage,
+    addEventListener,
+    removeEventListener,
+    dispatchMessage,
+    _listeners: listeners,
+  };
 }
 
 // ─── ServiceWorker Mock ───
 
 export interface MockServiceWorker {
-  postMessage: MockInstance<(message: unknown, transfer?: Transferable[]) => void>;
+  postMessage: MockInstance<
+    (message: unknown, transfer?: Transferable[]) => void
+  >;
 }
 
 export function createMockServiceWorker(): MockServiceWorker {
@@ -229,16 +266,20 @@ export interface MockServiceWorkerGlobalScope {
 export function createMockServiceWorkerGlobalScope(): MockServiceWorkerGlobalScope {
   const listeners: Array<(event: MessageEvent) => void> = [];
 
-  const addEventListener = vi.fn((type: string, handler: (event: MessageEvent) => void) => {
-    if (type === "message") listeners.push(handler);
-  });
+  const addEventListener = vi.fn(
+    (type: string, handler: (event: MessageEvent) => void) => {
+      if (type === "message") listeners.push(handler);
+    },
+  );
 
-  const removeEventListener = vi.fn((type: string, handler: (event: MessageEvent) => void) => {
-    if (type === "message") {
-      const idx = listeners.indexOf(handler);
-      if (idx !== -1) listeners.splice(idx, 1);
-    }
-  });
+  const removeEventListener = vi.fn(
+    (type: string, handler: (event: MessageEvent) => void) => {
+      if (type === "message") {
+        const idx = listeners.indexOf(handler);
+        if (idx !== -1) listeners.splice(idx, 1);
+      }
+    },
+  );
 
   const dispatchMessage = (data: unknown, ports?: MockMessagePort[]) => {
     const event = {
@@ -250,5 +291,10 @@ export function createMockServiceWorkerGlobalScope(): MockServiceWorkerGlobalSco
     }
   };
 
-  return { addEventListener, removeEventListener, dispatchMessage, _listeners: listeners };
+  return {
+    addEventListener,
+    removeEventListener,
+    dispatchMessage,
+    _listeners: listeners,
+  };
 }

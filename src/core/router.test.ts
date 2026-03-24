@@ -344,21 +344,21 @@ describe("core/router", () => {
   // ─── Error message exact format verification ───
 
   describe("error message exact format verification", () => {
-    test("duplicate method error uses exact format: Method \"<name>\" is already registered", () => {
+    test('duplicate method error uses exact format: Method "<name>" is already registered', () => {
       router.add("ping", vi.fn());
       expect(() => router.add("ping", vi.fn())).toThrow(
         'Method "ping" is already registered',
       );
     });
 
-    test("namespace conflict error uses exact format: Method \"<new>\" conflicts with existing method \"<existing>\"", () => {
+    test('namespace conflict error uses exact format: Method "<new>" conflicts with existing method "<existing>"', () => {
       router.add("user.get", vi.fn());
       expect(() => router.add("user", vi.fn())).toThrow(
         'Method "user" conflicts with existing method "user.get"',
       );
     });
 
-    test("reserved name error uses exact format: Method \"<name>\" conflicts with reserved client property \"<reserved>\"", () => {
+    test('reserved name error uses exact format: Method "<name>" conflicts with reserved client property "<reserved>"', () => {
       expect(() => router.add("$notify", vi.fn())).toThrow(
         'Method "$notify" conflicts with reserved client property "$notify"',
       );
@@ -646,7 +646,9 @@ describe("core/router", () => {
       );
 
       // Namespace conflict detection still works after 150 registrations
-      expect(() => router.add("ns0", vi.fn())).toThrow(/conflicts with existing method/);
+      expect(() => router.add("ns0", vi.fn())).toThrow(
+        /conflicts with existing method/,
+      );
 
       // New unique method can still be registered
       expect(() => router.add("ns99.method999", vi.fn())).not.toThrow();

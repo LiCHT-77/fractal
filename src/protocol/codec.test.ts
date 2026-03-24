@@ -1,5 +1,17 @@
-import { isJsonRpcMessage, isJsonRpcRequest, isJsonRpcResponse, isNotification, encodeSuccess, encodeError } from "./codec.ts";
-import { makeRequest, makeNotification, makeSuccessResponse, makeErrorResponse } from "../test-helpers.ts";
+import {
+  makeErrorResponse,
+  makeNotification,
+  makeRequest,
+  makeSuccessResponse,
+} from "../test-helpers.ts";
+import {
+  encodeError,
+  encodeSuccess,
+  isJsonRpcMessage,
+  isJsonRpcRequest,
+  isJsonRpcResponse,
+  isNotification,
+} from "./codec.ts";
 
 describe("protocol/codec", () => {
   // ─── isJsonRpcMessage ───
@@ -88,7 +100,9 @@ describe("protocol/codec", () => {
     });
 
     test("rejects message with non-string method", () => {
-      expect(isJsonRpcRequest({ jsonrpc: "2.0", method: 123, id: 1 })).toBe(false);
+      expect(isJsonRpcRequest({ jsonrpc: "2.0", method: 123, id: 1 })).toBe(
+        false,
+      );
     });
 
     test("rejects response (has result)", () => {
@@ -96,11 +110,20 @@ describe("protocol/codec", () => {
     });
 
     test("rejects response (has error)", () => {
-      expect(isJsonRpcRequest(makeErrorResponse(-32601, "Not found", 1))).toBe(false);
+      expect(isJsonRpcRequest(makeErrorResponse(-32601, "Not found", 1))).toBe(
+        false,
+      );
     });
 
     test("rejects request with array params", () => {
-      expect(isJsonRpcRequest({ jsonrpc: "2.0", method: "ping", params: [1, 2], id: 1 })).toBe(false);
+      expect(
+        isJsonRpcRequest({
+          jsonrpc: "2.0",
+          method: "ping",
+          params: [1, 2],
+          id: 1,
+        }),
+      ).toBe(false);
     });
 
     test("accepts request with object params", () => {
@@ -109,90 +132,146 @@ describe("protocol/codec", () => {
 
     // §2.1 dispatch: params omitted → {} normalization (valid request)
     test("accepts request with params omitted", () => {
-      expect(isJsonRpcRequest({ jsonrpc: "2.0", method: "ping", id: 1 })).toBe(true);
+      expect(isJsonRpcRequest({ jsonrpc: "2.0", method: "ping", id: 1 })).toBe(
+        true,
+      );
     });
 
     // §2.1 dispatch: params: undefined → {} normalization (valid request)
     test("accepts request with params: undefined", () => {
-      expect(isJsonRpcRequest({ jsonrpc: "2.0", method: "ping", params: undefined, id: 1 })).toBe(true);
+      expect(
+        isJsonRpcRequest({
+          jsonrpc: "2.0",
+          method: "ping",
+          params: undefined,
+          id: 1,
+        }),
+      ).toBe(true);
     });
 
     // §5.1 note 3: params as null is invalid (not a plain object)
     test("rejects request with params: null", () => {
-      expect(isJsonRpcRequest({ jsonrpc: "2.0", method: "ping", params: null, id: 1 })).toBe(false);
+      expect(
+        isJsonRpcRequest({
+          jsonrpc: "2.0",
+          method: "ping",
+          params: null,
+          id: 1,
+        }),
+      ).toBe(false);
     });
 
     // §5.1 note 3: params as primitive string is invalid
     test("rejects request with params as string", () => {
-      expect(isJsonRpcRequest({ jsonrpc: "2.0", method: "ping", params: "bad", id: 1 })).toBe(false);
+      expect(
+        isJsonRpcRequest({
+          jsonrpc: "2.0",
+          method: "ping",
+          params: "bad",
+          id: 1,
+        }),
+      ).toBe(false);
     });
 
     // §5.1 note 3: params as number is invalid
     test("rejects request with params as number", () => {
-      expect(isJsonRpcRequest({ jsonrpc: "2.0", method: "ping", params: 42, id: 1 })).toBe(false);
+      expect(
+        isJsonRpcRequest({ jsonrpc: "2.0", method: "ping", params: 42, id: 1 }),
+      ).toBe(false);
     });
 
     // §5.1 note 3: params as boolean is invalid
     test("rejects request with params as boolean", () => {
-      expect(isJsonRpcRequest({ jsonrpc: "2.0", method: "ping", params: true, id: 1 })).toBe(false);
+      expect(
+        isJsonRpcRequest({
+          jsonrpc: "2.0",
+          method: "ping",
+          params: true,
+          id: 1,
+        }),
+      ).toBe(false);
     });
 
     // §5.1 note 3(a): method as null is invalid (not a string)
     test("rejects request with method: null", () => {
-      expect(isJsonRpcRequest({ jsonrpc: "2.0", method: null, id: 1 })).toBe(false);
+      expect(isJsonRpcRequest({ jsonrpc: "2.0", method: null, id: 1 })).toBe(
+        false,
+      );
     });
 
     // §5.1 note 3(a): method as boolean is invalid
     test("rejects request with method: true", () => {
-      expect(isJsonRpcRequest({ jsonrpc: "2.0", method: true, id: 1 })).toBe(false);
+      expect(isJsonRpcRequest({ jsonrpc: "2.0", method: true, id: 1 })).toBe(
+        false,
+      );
     });
 
     // §5.1 note 3(a): method as object is invalid
     test("rejects request with method as object", () => {
-      expect(isJsonRpcRequest({ jsonrpc: "2.0", method: { name: "ping" }, id: 1 })).toBe(false);
+      expect(
+        isJsonRpcRequest({ jsonrpc: "2.0", method: { name: "ping" }, id: 1 }),
+      ).toBe(false);
     });
 
     // §5.1 note 3(a): method as array is invalid
     test("rejects request with method as array", () => {
-      expect(isJsonRpcRequest({ jsonrpc: "2.0", method: ["ping"], id: 1 })).toBe(false);
+      expect(
+        isJsonRpcRequest({ jsonrpc: "2.0", method: ["ping"], id: 1 }),
+      ).toBe(false);
     });
 
     // Empty string method: codec accepts any string (app-level validation is separate)
     test("accepts request with empty string method", () => {
-      expect(isJsonRpcRequest({ jsonrpc: "2.0", method: "", id: 1 })).toBe(true);
+      expect(isJsonRpcRequest({ jsonrpc: "2.0", method: "", id: 1 })).toBe(
+        true,
+      );
     });
 
     // §5.1 note 3: params: {} (empty object) is a valid plain object
     test("accepts request with params: {} (empty object)", () => {
-      expect(isJsonRpcRequest({ jsonrpc: "2.0", method: "ping", params: {}, id: 1 })).toBe(true);
+      expect(
+        isJsonRpcRequest({ jsonrpc: "2.0", method: "ping", params: {}, id: 1 }),
+      ).toBe(true);
     });
 
     // id edge cases: negative id is valid
     test("accepts request with id: -1", () => {
-      expect(isJsonRpcRequest({ jsonrpc: "2.0", method: "ping", id: -1 })).toBe(true);
+      expect(isJsonRpcRequest({ jsonrpc: "2.0", method: "ping", id: -1 })).toBe(
+        true,
+      );
     });
 
     // id edge cases: fractional id is valid (JSON-RPC spec allows number)
     test("accepts request with id: 0.5 (fractional)", () => {
-      expect(isJsonRpcRequest({ jsonrpc: "2.0", method: "ping", id: 0.5 })).toBe(true);
+      expect(
+        isJsonRpcRequest({ jsonrpc: "2.0", method: "ping", id: 0.5 }),
+      ).toBe(true);
     });
 
     // id edge cases: string "0" is a valid id
     test("accepts request with id: '0' (string zero)", () => {
-      expect(isJsonRpcRequest({ jsonrpc: "2.0", method: "ping", id: "0" })).toBe(true);
+      expect(
+        isJsonRpcRequest({ jsonrpc: "2.0", method: "ping", id: "0" }),
+      ).toBe(true);
     });
 
     // Non-ASCII method names: codec accepts any string (§2.1 allows non-ASCII characters)
     test("accepts request with Japanese method name", () => {
-      expect(isJsonRpcRequest({ jsonrpc: "2.0", method: "ユーザー.取得", id: 1 })).toBe(true);
+      expect(
+        isJsonRpcRequest({ jsonrpc: "2.0", method: "ユーザー.取得", id: 1 }),
+      ).toBe(true);
     });
 
     test("accepts request with emoji method name", () => {
-      expect(isJsonRpcRequest({ jsonrpc: "2.0", method: "🚀.launch", id: 1 })).toBe(true);
+      expect(
+        isJsonRpcRequest({ jsonrpc: "2.0", method: "🚀.launch", id: 1 }),
+      ).toBe(true);
     });
 
     test("accepts request with mixed non-ASCII method name", () => {
-      expect(isJsonRpcRequest({ jsonrpc: "2.0", method: "données.créer", id: 1 })).toBe(true);
+      expect(
+        isJsonRpcRequest({ jsonrpc: "2.0", method: "données.créer", id: 1 }),
+      ).toBe(true);
     });
   });
 
@@ -204,7 +283,9 @@ describe("protocol/codec", () => {
     });
 
     test("accepts error response", () => {
-      expect(isJsonRpcResponse(makeErrorResponse(-32601, "Not found", 1))).toBe(true);
+      expect(isJsonRpcResponse(makeErrorResponse(-32601, "Not found", 1))).toBe(
+        true,
+      );
     });
 
     test("rejects request message", () => {
@@ -228,27 +309,37 @@ describe("protocol/codec", () => {
 
     // result: undefined — key exists via "in", so it's still a response
     test("accepts response with result: undefined (key present)", () => {
-      expect(isJsonRpcResponse({ jsonrpc: "2.0", result: undefined, id: 1 })).toBe(true);
+      expect(
+        isJsonRpcResponse({ jsonrpc: "2.0", result: undefined, id: 1 }),
+      ).toBe(true);
     });
 
     // error: null — key exists via "in", still recognized as a response
     test("accepts response with error: null (key present)", () => {
-      expect(isJsonRpcResponse({ jsonrpc: "2.0", error: null, id: 1 })).toBe(true);
+      expect(isJsonRpcResponse({ jsonrpc: "2.0", error: null, id: 1 })).toBe(
+        true,
+      );
     });
 
     // error as empty object — structurally invalid but isJsonRpcResponse only checks field presence
     test("accepts response with error as empty object", () => {
-      expect(isJsonRpcResponse({ jsonrpc: "2.0", error: {}, id: 1 })).toBe(true);
+      expect(isJsonRpcResponse({ jsonrpc: "2.0", error: {}, id: 1 })).toBe(
+        true,
+      );
     });
 
     // error as string — structurally invalid but isJsonRpcResponse only checks field presence
     test("accepts response with error as string", () => {
-      expect(isJsonRpcResponse({ jsonrpc: "2.0", error: "bad", id: 1 })).toBe(true);
+      expect(isJsonRpcResponse({ jsonrpc: "2.0", error: "bad", id: 1 })).toBe(
+        true,
+      );
     });
 
     // error as number — structurally invalid but isJsonRpcResponse only checks field presence
     test("accepts response with error as number", () => {
-      expect(isJsonRpcResponse({ jsonrpc: "2.0", error: 42, id: 1 })).toBe(true);
+      expect(isJsonRpcResponse({ jsonrpc: "2.0", error: 42, id: 1 })).toBe(
+        true,
+      );
     });
 
     // response without id — still a valid response shape (id is required per spec, but codec only checks result/error presence)
@@ -258,7 +349,12 @@ describe("protocol/codec", () => {
 
     // response with error but without id
     test("accepts error response without id field", () => {
-      expect(isJsonRpcResponse({ jsonrpc: "2.0", error: { code: -32600, message: "Invalid" } })).toBe(true);
+      expect(
+        isJsonRpcResponse({
+          jsonrpc: "2.0",
+          error: { code: -32600, message: "Invalid" },
+        }),
+      ).toBe(true);
     });
   });
 
@@ -287,27 +383,37 @@ describe("protocol/codec", () => {
 
     // §4.5: "id" in request is true for id: undefined in JS, so NOT a notification
     test("id: undefined is NOT a notification (key exists in object)", () => {
-      expect(isNotification({ jsonrpc: "2.0", method: "ping", id: undefined })).toBe(false);
+      expect(
+        isNotification({ jsonrpc: "2.0", method: "ping", id: undefined }),
+      ).toBe(false);
     });
 
     // §4.5: id: 0 is a valid id, NOT a notification
     test("returns false when id is 0 (falsy but present)", () => {
-      expect(isNotification({ jsonrpc: "2.0", method: "ping", id: 0 })).toBe(false);
+      expect(isNotification({ jsonrpc: "2.0", method: "ping", id: 0 })).toBe(
+        false,
+      );
     });
 
     // §4.5: id: "" is a valid id, NOT a notification
     test("returns false when id is empty string (falsy but present)", () => {
-      expect(isNotification({ jsonrpc: "2.0", method: "ping", id: "" })).toBe(false);
+      expect(isNotification({ jsonrpc: "2.0", method: "ping", id: "" })).toBe(
+        false,
+      );
     });
 
     // id type edge cases: boolean id is questionable
     test("returns false when id is boolean (key exists)", () => {
-      expect(isNotification({ jsonrpc: "2.0", method: "ping", id: true })).toBe(false);
+      expect(isNotification({ jsonrpc: "2.0", method: "ping", id: true })).toBe(
+        false,
+      );
     });
 
     // id type edge cases: object id is questionable
     test("returns false when id is object (key exists)", () => {
-      expect(isNotification({ jsonrpc: "2.0", method: "ping", id: {} })).toBe(false);
+      expect(isNotification({ jsonrpc: "2.0", method: "ping", id: {} })).toBe(
+        false,
+      );
     });
   });
 
@@ -321,7 +427,11 @@ describe("protocol/codec", () => {
 
     test("encodes success response with string id", () => {
       const response = encodeSuccess({ data: true }, "abc");
-      expect(response).toEqual({ jsonrpc: "2.0", result: { data: true }, id: "abc" });
+      expect(response).toEqual({
+        jsonrpc: "2.0",
+        result: { data: true },
+        id: "abc",
+      });
     });
 
     test("encodes success response with null id", () => {
@@ -370,10 +480,16 @@ describe("protocol/codec", () => {
     });
 
     test("encodes error response with data", () => {
-      const response = encodeError(-32602, "Invalid params", 2, { field: "id" });
+      const response = encodeError(-32602, "Invalid params", 2, {
+        field: "id",
+      });
       expect(response).toEqual({
         jsonrpc: "2.0",
-        error: { code: -32602, message: "Invalid params", data: { field: "id" } },
+        error: {
+          code: -32602,
+          message: "Invalid params",
+          data: { field: "id" },
+        },
         id: 2,
       });
     });
@@ -477,8 +593,14 @@ describe("protocol/codec", () => {
     });
 
     test("error object has code, message, and data when data is provided", () => {
-      const response = encodeError(-32603, "Internal error", 1, { detail: "x" });
-      expect(Object.keys(response.error).sort()).toEqual(["code", "data", "message"]);
+      const response = encodeError(-32603, "Internal error", 1, {
+        detail: "x",
+      });
+      expect(Object.keys(response.error).sort()).toEqual([
+        "code",
+        "data",
+        "message",
+      ]);
     });
   });
 
@@ -505,17 +627,31 @@ describe("protocol/codec", () => {
     });
 
     test("params: { key: 'value' } (populated object) is accepted", () => {
-      const msg = { jsonrpc: "2.0", method: "ping", params: { key: "value" }, id: 1 };
+      const msg = {
+        jsonrpc: "2.0",
+        method: "ping",
+        params: { key: "value" },
+        id: 1,
+      };
       expect(isJsonRpcRequest(msg)).toBe(true);
     });
 
     // Invalid params types that would NOT be normalized — they are rejected at codec level
     test("params: null is rejected (not a plain object)", () => {
-      expect(isJsonRpcRequest({ jsonrpc: "2.0", method: "ping", params: null, id: 1 })).toBe(false);
+      expect(
+        isJsonRpcRequest({
+          jsonrpc: "2.0",
+          method: "ping",
+          params: null,
+          id: 1,
+        }),
+      ).toBe(false);
     });
 
     test("params: [] (empty array) is rejected", () => {
-      expect(isJsonRpcRequest({ jsonrpc: "2.0", method: "ping", params: [], id: 1 })).toBe(false);
+      expect(
+        isJsonRpcRequest({ jsonrpc: "2.0", method: "ping", params: [], id: 1 }),
+      ).toBe(false);
     });
   });
 
@@ -538,7 +674,9 @@ describe("protocol/codec", () => {
 
   describe("isJsonRpcResponse with string id", () => {
     test("accepts success response with string id", () => {
-      expect(isJsonRpcResponse({ jsonrpc: "2.0", result: "ok", id: "abc" })).toBe(true);
+      expect(
+        isJsonRpcResponse({ jsonrpc: "2.0", result: "ok", id: "abc" }),
+      ).toBe(true);
     });
   });
 
@@ -562,7 +700,10 @@ describe("protocol/codec", () => {
     });
 
     test("preserves array as result", () => {
-      const arrayResult = [{ id: 1, items: [{ name: "a" }] }, { id: 2, items: [] }];
+      const arrayResult = [
+        { id: 1, items: [{ name: "a" }] },
+        { id: 2, items: [] },
+      ];
       const response = encodeSuccess(arrayResult, 1);
       expect(response).toEqual({ jsonrpc: "2.0", result: arrayResult, id: 1 });
     });
@@ -579,10 +720,16 @@ describe("protocol/codec", () => {
     });
 
     test("encodes error response with string id and data", () => {
-      const response = encodeError(-32602, "Invalid params", "req-1", { detail: "missing field" });
+      const response = encodeError(-32602, "Invalid params", "req-1", {
+        detail: "missing field",
+      });
       expect(response).toEqual({
         jsonrpc: "2.0",
-        error: { code: -32602, message: "Invalid params", data: { detail: "missing field" } },
+        error: {
+          code: -32602,
+          message: "Invalid params",
+          data: { detail: "missing field" },
+        },
         id: "req-1",
       });
     });
@@ -602,36 +749,53 @@ describe("protocol/codec", () => {
 
   describe("extra properties on isJsonRpcMessage", () => {
     test("accepts object with jsonrpc: '2.0' and extra fields", () => {
-      expect(isJsonRpcMessage({ jsonrpc: "2.0", extraField: "something" })).toBe(true);
+      expect(
+        isJsonRpcMessage({ jsonrpc: "2.0", extraField: "something" }),
+      ).toBe(true);
     });
 
     test("accepts object with jsonrpc: '2.0' and multiple extra fields", () => {
-      expect(isJsonRpcMessage({ jsonrpc: "2.0", foo: 1, bar: "baz", nested: { a: true } })).toBe(true);
+      expect(
+        isJsonRpcMessage({
+          jsonrpc: "2.0",
+          foo: 1,
+          bar: "baz",
+          nested: { a: true },
+        }),
+      ).toBe(true);
     });
   });
 
   describe("batch request array rejected by guards", () => {
     // §4.1: batch requests (arrays) are not supported
     test("isJsonRpcMessage rejects a single-element batch array", () => {
-      expect(isJsonRpcMessage([{ jsonrpc: "2.0", method: "ping", id: 1 }])).toBe(false);
+      expect(
+        isJsonRpcMessage([{ jsonrpc: "2.0", method: "ping", id: 1 }]),
+      ).toBe(false);
     });
 
     test("isJsonRpcRequest rejects a single-element batch array", () => {
-      expect(isJsonRpcRequest([{ jsonrpc: "2.0", method: "ping", id: 1 }])).toBe(false);
+      expect(
+        isJsonRpcRequest([{ jsonrpc: "2.0", method: "ping", id: 1 }]),
+      ).toBe(false);
     });
 
     test("isJsonRpcRequest rejects a multi-element batch array", () => {
-      expect(isJsonRpcRequest([
-        { jsonrpc: "2.0", method: "ping", id: 1 },
-        { jsonrpc: "2.0", method: "pong", id: 2 },
-      ])).toBe(false);
+      expect(
+        isJsonRpcRequest([
+          { jsonrpc: "2.0", method: "ping", id: 1 },
+          { jsonrpc: "2.0", method: "pong", id: 2 },
+        ]),
+      ).toBe(false);
     });
 
     test("isJsonRpcResponse rejects a batch array of responses", () => {
-      expect(isJsonRpcResponse([
-        { jsonrpc: "2.0", result: "ok", id: 1 },
-        { jsonrpc: "2.0", result: "ok", id: 2 },
-      ])).toBe(false);
+      expect(
+        isJsonRpcResponse([
+          { jsonrpc: "2.0", result: "ok", id: 1 },
+          { jsonrpc: "2.0", result: "ok", id: 2 },
+        ]),
+      ).toBe(false);
     });
   });
 
@@ -654,24 +818,36 @@ describe("protocol/codec", () => {
     });
 
     test("encodeSuccess with string id is recognized by isJsonRpcResponse", () => {
-      expect(isJsonRpcResponse(encodeSuccess({ data: true }, "req-1"))).toBe(true);
+      expect(isJsonRpcResponse(encodeSuccess({ data: true }, "req-1"))).toBe(
+        true,
+      );
     });
 
     // Verify that encodeError output always passes isJsonRpcResponse
     test("encodeError output is recognized by isJsonRpcResponse", () => {
-      expect(isJsonRpcResponse(encodeError(-32601, "Method not found", 1))).toBe(true);
+      expect(
+        isJsonRpcResponse(encodeError(-32601, "Method not found", 1)),
+      ).toBe(true);
     });
 
     test("encodeError with null id is recognized by isJsonRpcResponse", () => {
-      expect(isJsonRpcResponse(encodeError(-32603, "Internal error", null))).toBe(true);
+      expect(
+        isJsonRpcResponse(encodeError(-32603, "Internal error", null)),
+      ).toBe(true);
     });
 
     test("encodeError with undefined id (normalized to null) is recognized by isJsonRpcResponse", () => {
-      expect(isJsonRpcResponse(encodeError(-32601, "Method not found", undefined))).toBe(true);
+      expect(
+        isJsonRpcResponse(encodeError(-32601, "Method not found", undefined)),
+      ).toBe(true);
     });
 
     test("encodeError with data is recognized by isJsonRpcResponse", () => {
-      expect(isJsonRpcResponse(encodeError(-32602, "Invalid params", 1, { field: "x" }))).toBe(true);
+      expect(
+        isJsonRpcResponse(
+          encodeError(-32602, "Invalid params", 1, { field: "x" }),
+        ),
+      ).toBe(true);
     });
 
     // Verify that encoded responses are NOT classified as requests
@@ -680,7 +856,9 @@ describe("protocol/codec", () => {
     });
 
     test("encodeError output is rejected by isJsonRpcRequest", () => {
-      expect(isJsonRpcRequest(encodeError(-32601, "Method not found", 1))).toBe(false);
+      expect(isJsonRpcRequest(encodeError(-32601, "Method not found", 1))).toBe(
+        false,
+      );
     });
   });
 
@@ -742,7 +920,11 @@ describe("protocol/codec", () => {
     test("notification has no id → encodeError with undefined id normalizes to null", () => {
       const notification = makeNotification("log.info");
       expect(isNotification(notification)).toBe(true);
-      const response = encodeError(-32603, "Internal error", notification.id as undefined);
+      const response = encodeError(
+        -32603,
+        "Internal error",
+        notification.id as undefined,
+      );
       expect(response.id).toBeNull();
     });
 
@@ -803,7 +985,14 @@ describe("protocol/codec", () => {
   describe("isJsonRpcRequest with non-plain object params (isPlainObject behavior)", () => {
     test("accepts params containing a Date instance (isPlainObject returns false for Date, but params itself is a plain object)", () => {
       // A plain object that happens to contain a Date value — the params object itself is a plain object
-      expect(isJsonRpcRequest({ jsonrpc: "2.0", method: "ping", params: { ts: new Date() }, id: 1 })).toBe(true);
+      expect(
+        isJsonRpcRequest({
+          jsonrpc: "2.0",
+          method: "ping",
+          params: { ts: new Date() },
+          id: 1,
+        }),
+      ).toBe(true);
     });
 
     test("rejects params that IS a Date instance (not a plain object)", () => {
@@ -811,19 +1000,40 @@ describe("protocol/codec", () => {
       // so a Date actually passes isPlainObject. This documents that behavior.
       const dateAsParams = new Date();
       // isPlainObject: typeof === "object" ✓, !== null ✓, !Array.isArray ✓ → true
-      expect(isJsonRpcRequest({ jsonrpc: "2.0", method: "ping", params: dateAsParams, id: 1 })).toBe(true);
+      expect(
+        isJsonRpcRequest({
+          jsonrpc: "2.0",
+          method: "ping",
+          params: dateAsParams,
+          id: 1,
+        }),
+      ).toBe(true);
     });
 
     test("accepts params that IS a Map instance (isPlainObject returns true for Map)", () => {
       // Map: typeof === "object" ✓, !== null ✓, !Array.isArray ✓ → isPlainObject returns true
       const mapAsParams = new Map([["key", "value"]]);
-      expect(isJsonRpcRequest({ jsonrpc: "2.0", method: "ping", params: mapAsParams, id: 1 })).toBe(true);
+      expect(
+        isJsonRpcRequest({
+          jsonrpc: "2.0",
+          method: "ping",
+          params: mapAsParams,
+          id: 1,
+        }),
+      ).toBe(true);
     });
 
     test("accepts params that IS a Set instance (isPlainObject returns true for Set)", () => {
       // Set: typeof === "object" ✓, !== null ✓, !Array.isArray ✓ → isPlainObject returns true
       const setAsParams = new Set([1, 2, 3]);
-      expect(isJsonRpcRequest({ jsonrpc: "2.0", method: "ping", params: setAsParams, id: 1 })).toBe(true);
+      expect(
+        isJsonRpcRequest({
+          jsonrpc: "2.0",
+          method: "ping",
+          params: setAsParams,
+          id: 1,
+        }),
+      ).toBe(true);
     });
   });
 
@@ -835,12 +1045,26 @@ describe("protocol/codec", () => {
     test("accepts params created with Object.create(null)", () => {
       const nullProto = Object.create(null);
       nullProto.key = "value";
-      expect(isJsonRpcRequest({ jsonrpc: "2.0", method: "ping", params: nullProto, id: 1 })).toBe(true);
+      expect(
+        isJsonRpcRequest({
+          jsonrpc: "2.0",
+          method: "ping",
+          params: nullProto,
+          id: 1,
+        }),
+      ).toBe(true);
     });
 
     test("accepts empty Object.create(null) as params", () => {
       const nullProto = Object.create(null);
-      expect(isJsonRpcRequest({ jsonrpc: "2.0", method: "ping", params: nullProto, id: 1 })).toBe(true);
+      expect(
+        isJsonRpcRequest({
+          jsonrpc: "2.0",
+          method: "ping",
+          params: nullProto,
+          id: 1,
+        }),
+      ).toBe(true);
     });
 
     // Class instances: typeof === "object" ✓, !== null ✓, !Array.isArray ✓ → isPlainObject returns true
@@ -853,23 +1077,46 @@ describe("protocol/codec", () => {
         }
       }
       const instance = new MyParams("value");
-      expect(isJsonRpcRequest({ jsonrpc: "2.0", method: "ping", params: instance, id: 1 })).toBe(true);
+      expect(
+        isJsonRpcRequest({
+          jsonrpc: "2.0",
+          method: "ping",
+          params: instance,
+          id: 1,
+        }),
+      ).toBe(true);
     });
 
     test("accepts class instance with methods as params", () => {
       class ParamsWithMethod {
         data = 42;
-        getData() { return this.data; }
+        getData() {
+          return this.data;
+        }
       }
       const instance = new ParamsWithMethod();
-      expect(isJsonRpcRequest({ jsonrpc: "2.0", method: "ping", params: instance, id: 1 })).toBe(true);
+      expect(
+        isJsonRpcRequest({
+          jsonrpc: "2.0",
+          method: "ping",
+          params: instance,
+          id: 1,
+        }),
+      ).toBe(true);
     });
 
     // Proxy wrapping a plain object: typeof === "object" ✓, !== null ✓, !Array.isArray ✓ → true
     test("accepts Proxy wrapping a plain object as params", () => {
       const target = { key: "value" };
       const proxy = new Proxy(target, {});
-      expect(isJsonRpcRequest({ jsonrpc: "2.0", method: "ping", params: proxy, id: 1 })).toBe(true);
+      expect(
+        isJsonRpcRequest({
+          jsonrpc: "2.0",
+          method: "ping",
+          params: proxy,
+          id: 1,
+        }),
+      ).toBe(true);
     });
 
     test("accepts Proxy with custom handler as params", () => {
@@ -880,13 +1127,27 @@ describe("protocol/codec", () => {
           return Reflect.get(t, prop);
         },
       });
-      expect(isJsonRpcRequest({ jsonrpc: "2.0", method: "ping", params: proxy, id: 1 })).toBe(true);
+      expect(
+        isJsonRpcRequest({
+          jsonrpc: "2.0",
+          method: "ping",
+          params: proxy,
+          id: 1,
+        }),
+      ).toBe(true);
     });
 
     // Proxy wrapping an array: Array.isArray sees through Proxy → isPlainObject returns false
     test("rejects Proxy wrapping an array as params", () => {
       const proxy = new Proxy([1, 2, 3], {});
-      expect(isJsonRpcRequest({ jsonrpc: "2.0", method: "ping", params: proxy, id: 1 })).toBe(false);
+      expect(
+        isJsonRpcRequest({
+          jsonrpc: "2.0",
+          method: "ping",
+          params: proxy,
+          id: 1,
+        }),
+      ).toBe(false);
     });
 
     // Also test via isJsonRpcMessage for Object.create(null) as the top-level message
@@ -976,23 +1237,45 @@ describe("protocol/codec", () => {
 
     // method + error: isJsonRpcRequest rejects (error present), isJsonRpcResponse rejects (method present)
     test("message with method + error: isJsonRpcRequest → false", () => {
-      const msg = { jsonrpc: "2.0", method: "ping", error: { code: -32600, message: "Invalid" }, id: 1 };
+      const msg = {
+        jsonrpc: "2.0",
+        method: "ping",
+        error: { code: -32600, message: "Invalid" },
+        id: 1,
+      };
       expect(isJsonRpcRequest(msg)).toBe(false);
     });
 
     test("message with method + error: isJsonRpcResponse → false", () => {
-      const msg = { jsonrpc: "2.0", method: "ping", error: { code: -32600, message: "Invalid" }, id: 1 };
+      const msg = {
+        jsonrpc: "2.0",
+        method: "ping",
+        error: { code: -32600, message: "Invalid" },
+        id: 1,
+      };
       expect(isJsonRpcResponse(msg)).toBe(false);
     });
 
     // method + result + error: isJsonRpcRequest rejects, isJsonRpcResponse rejects
     test("message with method + result + error: isJsonRpcRequest → false", () => {
-      const msg = { jsonrpc: "2.0", method: "ping", result: "ok", error: { code: -32600, message: "Invalid" }, id: 1 };
+      const msg = {
+        jsonrpc: "2.0",
+        method: "ping",
+        result: "ok",
+        error: { code: -32600, message: "Invalid" },
+        id: 1,
+      };
       expect(isJsonRpcRequest(msg)).toBe(false);
     });
 
     test("message with method + result + error: isJsonRpcResponse → false", () => {
-      const msg = { jsonrpc: "2.0", method: "ping", result: "ok", error: { code: -32600, message: "Invalid" }, id: 1 };
+      const msg = {
+        jsonrpc: "2.0",
+        method: "ping",
+        result: "ok",
+        error: { code: -32600, message: "Invalid" },
+        id: 1,
+      };
       expect(isJsonRpcResponse(msg)).toBe(false);
     });
 
@@ -1003,7 +1286,11 @@ describe("protocol/codec", () => {
     });
 
     test("message with error only (no method): isJsonRpcResponse → true", () => {
-      const msg = { jsonrpc: "2.0", error: { code: -32600, message: "Invalid" }, id: 1 };
+      const msg = {
+        jsonrpc: "2.0",
+        error: { code: -32600, message: "Invalid" },
+        id: 1,
+      };
       expect(isJsonRpcResponse(msg)).toBe(true);
     });
 
@@ -1019,60 +1306,108 @@ describe("protocol/codec", () => {
   describe("id type is not validated (§5.1 note 3)", () => {
     // isJsonRpcRequest accepts non-standard id types (object, array, boolean)
     test("isJsonRpcRequest accepts id as object", () => {
-      expect(isJsonRpcRequest({ jsonrpc: "2.0", method: "ping", id: { key: "value" } })).toBe(true);
+      expect(
+        isJsonRpcRequest({
+          jsonrpc: "2.0",
+          method: "ping",
+          id: { key: "value" },
+        }),
+      ).toBe(true);
     });
 
     test("isJsonRpcRequest accepts id as array", () => {
-      expect(isJsonRpcRequest({ jsonrpc: "2.0", method: "ping", id: [1, 2, 3] })).toBe(true);
+      expect(
+        isJsonRpcRequest({ jsonrpc: "2.0", method: "ping", id: [1, 2, 3] }),
+      ).toBe(true);
     });
 
     test("isJsonRpcRequest accepts id as boolean true", () => {
-      expect(isJsonRpcRequest({ jsonrpc: "2.0", method: "ping", id: true })).toBe(true);
+      expect(
+        isJsonRpcRequest({ jsonrpc: "2.0", method: "ping", id: true }),
+      ).toBe(true);
     });
 
     test("isJsonRpcRequest accepts id as boolean false", () => {
-      expect(isJsonRpcRequest({ jsonrpc: "2.0", method: "ping", id: false })).toBe(true);
+      expect(
+        isJsonRpcRequest({ jsonrpc: "2.0", method: "ping", id: false }),
+      ).toBe(true);
     });
 
     test("isJsonRpcRequest accepts id as nested object", () => {
-      expect(isJsonRpcRequest({ jsonrpc: "2.0", method: "ping", id: { a: { b: 1 } } })).toBe(true);
+      expect(
+        isJsonRpcRequest({
+          jsonrpc: "2.0",
+          method: "ping",
+          id: { a: { b: 1 } },
+        }),
+      ).toBe(true);
     });
 
     test("isJsonRpcRequest accepts id as empty array", () => {
-      expect(isJsonRpcRequest({ jsonrpc: "2.0", method: "ping", id: [] })).toBe(true);
+      expect(isJsonRpcRequest({ jsonrpc: "2.0", method: "ping", id: [] })).toBe(
+        true,
+      );
     });
 
     test("isJsonRpcRequest accepts id as empty object", () => {
-      expect(isJsonRpcRequest({ jsonrpc: "2.0", method: "ping", id: {} })).toBe(true);
+      expect(isJsonRpcRequest({ jsonrpc: "2.0", method: "ping", id: {} })).toBe(
+        true,
+      );
     });
 
     // isJsonRpcResponse accepts non-standard id types (object, array, boolean)
     test("isJsonRpcResponse accepts id as object", () => {
-      expect(isJsonRpcResponse({ jsonrpc: "2.0", result: "ok", id: { key: "value" } })).toBe(true);
+      expect(
+        isJsonRpcResponse({
+          jsonrpc: "2.0",
+          result: "ok",
+          id: { key: "value" },
+        }),
+      ).toBe(true);
     });
 
     test("isJsonRpcResponse accepts id as array", () => {
-      expect(isJsonRpcResponse({ jsonrpc: "2.0", result: "ok", id: [1, 2, 3] })).toBe(true);
+      expect(
+        isJsonRpcResponse({ jsonrpc: "2.0", result: "ok", id: [1, 2, 3] }),
+      ).toBe(true);
     });
 
     test("isJsonRpcResponse accepts id as boolean true", () => {
-      expect(isJsonRpcResponse({ jsonrpc: "2.0", result: "ok", id: true })).toBe(true);
+      expect(
+        isJsonRpcResponse({ jsonrpc: "2.0", result: "ok", id: true }),
+      ).toBe(true);
     });
 
     test("isJsonRpcResponse accepts id as boolean false", () => {
-      expect(isJsonRpcResponse({ jsonrpc: "2.0", result: "ok", id: false })).toBe(true);
+      expect(
+        isJsonRpcResponse({ jsonrpc: "2.0", result: "ok", id: false }),
+      ).toBe(true);
     });
 
     test("isJsonRpcResponse accepts id as nested object", () => {
-      expect(isJsonRpcResponse({ jsonrpc: "2.0", error: { code: -1, message: "err" }, id: { a: { b: 1 } } })).toBe(true);
+      expect(
+        isJsonRpcResponse({
+          jsonrpc: "2.0",
+          error: { code: -1, message: "err" },
+          id: { a: { b: 1 } },
+        }),
+      ).toBe(true);
     });
 
     test("isJsonRpcResponse accepts id as empty array", () => {
-      expect(isJsonRpcResponse({ jsonrpc: "2.0", error: { code: -1, message: "err" }, id: [] })).toBe(true);
+      expect(
+        isJsonRpcResponse({
+          jsonrpc: "2.0",
+          error: { code: -1, message: "err" },
+          id: [],
+        }),
+      ).toBe(true);
     });
 
     test("isJsonRpcResponse accepts id as empty object", () => {
-      expect(isJsonRpcResponse({ jsonrpc: "2.0", result: null, id: {} })).toBe(true);
+      expect(isJsonRpcResponse({ jsonrpc: "2.0", result: null, id: {} })).toBe(
+        true,
+      );
     });
   });
 
@@ -1089,7 +1424,9 @@ describe("protocol/codec", () => {
 
     // With data: error object has exactly {code, message, data}, no extra fields
     test("error object with data has exactly 'code', 'message', and 'data' keys (no extras)", () => {
-      const response = encodeError(-32602, "Invalid params", 1, { field: "id" });
+      const response = encodeError(-32602, "Invalid params", 1, {
+        field: "id",
+      });
       const errorKeys = Object.keys(response.error);
       expect(errorKeys).toHaveLength(3);
       expect(errorKeys.sort()).toEqual(["code", "data", "message"]);
@@ -1136,7 +1473,9 @@ describe("protocol/codec", () => {
     });
 
     test("response object with data has exactly 'jsonrpc', 'error', and 'id' keys", () => {
-      const response = encodeError(-32602, "Invalid params", 1, { detail: "x" });
+      const response = encodeError(-32602, "Invalid params", 1, {
+        detail: "x",
+      });
       const responseKeys = Object.keys(response);
       expect(responseKeys).toHaveLength(3);
       expect(responseKeys.sort()).toEqual(["error", "id", "jsonrpc"]);
@@ -1170,39 +1509,67 @@ describe("protocol/codec", () => {
     // document this boundary.
 
     test("accepts empty string method (app layer validates, not codec)", () => {
-      expect(isJsonRpcRequest({ jsonrpc: "2.0", method: "", id: 1 })).toBe(true);
+      expect(isJsonRpcRequest({ jsonrpc: "2.0", method: "", id: 1 })).toBe(
+        true,
+      );
     });
 
     test("accepts method with rpc. prefix (app layer validates, not codec)", () => {
-      expect(isJsonRpcRequest({ jsonrpc: "2.0", method: "rpc.discover", id: 1 })).toBe(true);
+      expect(
+        isJsonRpcRequest({ jsonrpc: "2.0", method: "rpc.discover", id: 1 }),
+      ).toBe(true);
     });
 
     test("accepts method with rpc. prefix and sub-namespace (app layer validates, not codec)", () => {
-      expect(isJsonRpcRequest({ jsonrpc: "2.0", method: "rpc.system.listMethods", id: 1 })).toBe(true);
+      expect(
+        isJsonRpcRequest({
+          jsonrpc: "2.0",
+          method: "rpc.system.listMethods",
+          id: 1,
+        }),
+      ).toBe(true);
     });
 
     test("accepts method with leading dot (app layer validates, not codec)", () => {
-      expect(isJsonRpcRequest({ jsonrpc: "2.0", method: ".user", id: 1 })).toBe(true);
+      expect(isJsonRpcRequest({ jsonrpc: "2.0", method: ".user", id: 1 })).toBe(
+        true,
+      );
     });
 
     test("accepts method with trailing dot (app layer validates, not codec)", () => {
-      expect(isJsonRpcRequest({ jsonrpc: "2.0", method: "user.", id: 1 })).toBe(true);
+      expect(isJsonRpcRequest({ jsonrpc: "2.0", method: "user.", id: 1 })).toBe(
+        true,
+      );
     });
 
     test("accepts method with consecutive dots (app layer validates, not codec)", () => {
-      expect(isJsonRpcRequest({ jsonrpc: "2.0", method: "user..get", id: 1 })).toBe(true);
+      expect(
+        isJsonRpcRequest({ jsonrpc: "2.0", method: "user..get", id: 1 }),
+      ).toBe(true);
     });
 
     test("accepts reserved client property names as method (app layer validates, not codec)", () => {
-      expect(isJsonRpcRequest({ jsonrpc: "2.0", method: "then", id: 1 })).toBe(true);
-      expect(isJsonRpcRequest({ jsonrpc: "2.0", method: "$notify", id: 1 })).toBe(true);
-      expect(isJsonRpcRequest({ jsonrpc: "2.0", method: "dispose", id: 1 })).toBe(true);
+      expect(isJsonRpcRequest({ jsonrpc: "2.0", method: "then", id: 1 })).toBe(
+        true,
+      );
+      expect(
+        isJsonRpcRequest({ jsonrpc: "2.0", method: "$notify", id: 1 }),
+      ).toBe(true);
+      expect(
+        isJsonRpcRequest({ jsonrpc: "2.0", method: "dispose", id: 1 }),
+      ).toBe(true);
     });
 
     test("accepts reserved names as namespace prefix (app layer validates, not codec)", () => {
-      expect(isJsonRpcRequest({ jsonrpc: "2.0", method: "then.check", id: 1 })).toBe(true);
-      expect(isJsonRpcRequest({ jsonrpc: "2.0", method: "$notify.log", id: 1 })).toBe(true);
-      expect(isJsonRpcRequest({ jsonrpc: "2.0", method: "dispose.all", id: 1 })).toBe(true);
+      expect(
+        isJsonRpcRequest({ jsonrpc: "2.0", method: "then.check", id: 1 }),
+      ).toBe(true);
+      expect(
+        isJsonRpcRequest({ jsonrpc: "2.0", method: "$notify.log", id: 1 }),
+      ).toBe(true);
+      expect(
+        isJsonRpcRequest({ jsonrpc: "2.0", method: "dispose.all", id: 1 }),
+      ).toBe(true);
     });
 
     // Also verify these work as notifications (no id)
@@ -1211,7 +1578,9 @@ describe("protocol/codec", () => {
     });
 
     test("accepts rpc. prefix method as notification (app layer validates, not codec)", () => {
-      expect(isJsonRpcRequest({ jsonrpc: "2.0", method: "rpc.discover" })).toBe(true);
+      expect(isJsonRpcRequest({ jsonrpc: "2.0", method: "rpc.discover" })).toBe(
+        true,
+      );
     });
   });
 });

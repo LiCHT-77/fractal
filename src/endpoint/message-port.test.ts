@@ -1,5 +1,5 @@
-import { messagePortEndpoint } from "./message-port.ts";
 import { createMockMessagePort } from "../test-helpers.ts";
+import { messagePortEndpoint } from "./message-port.ts";
 
 describe("endpoint/message-port", () => {
   test("send() calls port.postMessage", () => {
@@ -28,7 +28,10 @@ describe("endpoint/message-port", () => {
 
     const handler = vi.fn();
     endpoint.onMessage(handler);
-    expect(port.addEventListener).toHaveBeenCalledWith("message", expect.any(Function));
+    expect(port.addEventListener).toHaveBeenCalledWith(
+      "message",
+      expect.any(Function),
+    );
   });
 
   test("onMessage ignores non-JSON-RPC messages", () => {
@@ -71,7 +74,10 @@ describe("endpoint/message-port", () => {
     const handler = vi.fn();
     const dispose = endpoint.onMessage(handler);
     dispose();
-    expect(port.removeEventListener).toHaveBeenCalledWith("message", expect.any(Function));
+    expect(port.removeEventListener).toHaveBeenCalledWith(
+      "message",
+      expect.any(Function),
+    );
   });
 
   test("multiple onMessage calls each call port.start()", () => {
@@ -169,7 +175,10 @@ describe("endpoint/message-port", () => {
 
     const msg = { jsonrpc: "2.0", method: "ping", id: 1 };
     port.dispatchMessage(msg);
-    expect(handler).toHaveBeenCalledWith(msg, expect.objectContaining({ data: msg }));
+    expect(handler).toHaveBeenCalledWith(
+      msg,
+      expect.objectContaining({ data: msg }),
+    );
   });
 
   test("port.start() is called each time onMessage() is called (idempotent)", () => {
@@ -317,7 +326,10 @@ describe("endpoint/message-port", () => {
     // Receiving messages works
     const msg = { jsonrpc: "2.0", method: "data.fetch", id: 2 };
     port.dispatchMessage(msg);
-    expect(handler).toHaveBeenCalledWith(msg, expect.objectContaining({ data: msg }));
+    expect(handler).toHaveBeenCalledWith(
+      msg,
+      expect.objectContaining({ data: msg }),
+    );
   });
 
   // ─── port.start() timing ───
@@ -413,7 +425,10 @@ describe("endpoint/message-port", () => {
     const handler = vi.fn();
     endpoint.onMessage(handler);
     port.dispatchMessage(largeMessage);
-    expect(handler).toHaveBeenCalledWith(largeMessage, expect.objectContaining({ data: largeMessage }));
+    expect(handler).toHaveBeenCalledWith(
+      largeMessage,
+      expect.objectContaining({ data: largeMessage }),
+    );
   });
 
   // ─── Batch Request (array message) is ignored ───
@@ -506,12 +521,22 @@ describe("endpoint/message-port", () => {
 
     // Passing an object containing a function
     expect(() => {
-      endpoint.send({ jsonrpc: "2.0", method: "test", id: 1, params: { fn: () => {} } });
+      endpoint.send({
+        jsonrpc: "2.0",
+        method: "test",
+        id: 1,
+        params: { fn: () => {} },
+      });
     }).toThrow(cloneError);
 
     // Passing an object containing a Symbol
     expect(() => {
-      endpoint.send({ jsonrpc: "2.0", method: "test", id: 2, params: { sym: Symbol("x") } });
+      endpoint.send({
+        jsonrpc: "2.0",
+        method: "test",
+        id: 2,
+        params: { sym: Symbol("x") },
+      });
     }).toThrow(cloneError);
   });
 
@@ -595,16 +620,16 @@ describe("endpoint/message-port", () => {
     const dispose = endpoint.onMessage(handler);
 
     // Capture the listener that was registered via addEventListener
-    const addedListener = (port.addEventListener as ReturnType<typeof vi.fn>).mock.calls.find(
-      (call) => call[0] === "message",
-    )![1];
+    const addedListener = (
+      port.addEventListener as ReturnType<typeof vi.fn>
+    ).mock.calls.find((call) => call[0] === "message")![1];
 
     dispose();
 
     // Capture the listener that was removed via removeEventListener
-    const removedListener = (port.removeEventListener as ReturnType<typeof vi.fn>).mock.calls.find(
-      (call) => call[0] === "message",
-    )![1];
+    const removedListener = (
+      port.removeEventListener as ReturnType<typeof vi.fn>
+    ).mock.calls.find((call) => call[0] === "message")![1];
 
     // The exact same function reference must be used for both add and remove
     expect(removedListener).toBe(addedListener);
@@ -652,6 +677,9 @@ describe("endpoint/message-port", () => {
     port.dispatchMessage(minimalMessage);
 
     expect(handler).toHaveBeenCalledTimes(1);
-    expect(handler).toHaveBeenCalledWith(minimalMessage, expect.objectContaining({ data: minimalMessage }));
+    expect(handler).toHaveBeenCalledWith(
+      minimalMessage,
+      expect.objectContaining({ data: minimalMessage }),
+    );
   });
 });
