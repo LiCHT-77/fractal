@@ -1,4 +1,6 @@
-interface MessagePortLike {
+import type { Endpoint } from "./types.ts";
+
+export interface MessagePortLike {
   postMessage(message: unknown): void;
   addEventListener(type: string, listener: (event: MessageEvent) => void): void;
   removeEventListener(
@@ -6,13 +8,6 @@ interface MessagePortLike {
     listener: (event: MessageEvent) => void,
   ): void;
   start(): void;
-}
-
-interface Endpoint {
-  send(message: unknown): void;
-  onMessage(
-    handler: (message: unknown, event: MessageEvent) => void,
-  ): () => void;
 }
 
 function isJsonRpcMessage(data: unknown): data is { jsonrpc: "2.0" } {

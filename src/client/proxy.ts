@@ -1,17 +1,11 @@
 export { FractalError, RpcError } from "../protocol/errors.ts";
 
 import type { Fractal } from "../core/app.ts";
+import type { Endpoint } from "../endpoint/types.ts";
 import { FractalError, RpcError } from "../protocol/errors.ts";
 import type { FractalClient, InferSchema } from "../types.ts";
 
-interface Endpoint {
-  send(message: unknown): void;
-  onMessage(
-    handler: (message: unknown, event: MessageEvent) => void,
-  ): () => void;
-}
-
-interface ClientOptions {
+export interface ClientOptions {
   defaultTimeout?: number;
 }
 

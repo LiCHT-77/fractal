@@ -14,11 +14,11 @@ import { createContext } from "./context.ts";
 import { MiddlewareRegistry } from "./middleware.ts";
 import { Router } from "./router.ts";
 
-type Handler = (
+export type Handler = (
   // biome-ignore lint/suspicious/noExplicitAny: any is needed so Context<T> for all T satisfies this constraint
   c: Context<any>,
 ) => JsonRpcResponse | Promise<JsonRpcResponse>;
-type Middleware = (
+export type Middleware = (
   c: Context,
   next: () => Promise<void>,
   // biome-ignore lint/suspicious/noConfusingVoidType: middleware may return void

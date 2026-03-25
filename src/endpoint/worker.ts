@@ -1,17 +1,12 @@
-interface WorkerLike {
+import type { Endpoint } from "./types.ts";
+
+export interface WorkerLike {
   postMessage(message: unknown): void;
   addEventListener(type: string, listener: (event: MessageEvent) => void): void;
   removeEventListener(
     type: string,
     listener: (event: MessageEvent) => void,
   ): void;
-}
-
-interface Endpoint {
-  send(message: unknown): void;
-  onMessage(
-    handler: (message: unknown, event: MessageEvent) => void,
-  ): () => void;
 }
 
 function isJsonRpcMessage(data: unknown): data is { jsonrpc: "2.0" } {

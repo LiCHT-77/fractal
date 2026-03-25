@@ -1,9 +1,4 @@
-export interface Endpoint {
-  send(message: unknown): void;
-  onMessage(
-    handler: (message: unknown, event: MessageEvent) => void,
-  ): () => void;
-}
+import type { Endpoint } from "./types.ts";
 
 export interface WindowEndpointOptions {
   origin?: string;

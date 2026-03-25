@@ -1,3 +1,4 @@
+import type { Endpoint } from "./types.ts";
 import { FractalError } from "../protocol/errors.ts";
 
 interface MessagePortLike {
@@ -10,14 +11,7 @@ interface MessagePortLike {
   start?: (() => void) | unknown;
 }
 
-interface Endpoint {
-  send(message: unknown): void;
-  onMessage(
-    handler: (message: unknown, event: MessageEvent) => void,
-  ): () => void;
-}
-
-interface ServiceWorkerEndpointOptions {
+export interface ServiceWorkerEndpointOptions {
   timeout?: number;
 }
 
@@ -71,11 +65,11 @@ function createPortEndpoint(port: MessagePortLike): Endpoint {
   };
 }
 
-interface ServiceWorkerLike {
+export interface ServiceWorkerLike {
   postMessage(message: unknown, transfer?: Transferable[]): void;
 }
 
-interface ServiceWorkerContainerLike {
+export interface ServiceWorkerContainerLike {
   ready: Promise<{ active: ServiceWorkerLike | null }>;
 }
 

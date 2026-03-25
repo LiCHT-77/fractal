@@ -1,8 +1,10 @@
-interface ExtensionMessageSender {
+import type { Endpoint } from "./types.ts";
+
+export interface ExtensionMessageSender {
   tab?: { id?: number };
 }
 
-interface ExtensionRuntimeLike {
+export interface ExtensionRuntimeLike {
   sendMessage(message: unknown): void;
   onMessage: {
     addListener(
@@ -14,20 +16,13 @@ interface ExtensionRuntimeLike {
   };
 }
 
-interface ExtensionTabsLike {
+export interface ExtensionTabsLike {
   sendMessage(tabId: number, message: unknown): void;
 }
 
-interface ExtensionBrowserLike {
+export interface ExtensionBrowserLike {
   runtime: ExtensionRuntimeLike;
   tabs: ExtensionTabsLike;
-}
-
-interface Endpoint {
-  send(message: unknown): void;
-  onMessage(
-    handler: (message: unknown, event: MessageEvent) => void,
-  ): () => void;
 }
 
 function isJsonRpcMessage(data: unknown): data is { jsonrpc: "2.0" } {

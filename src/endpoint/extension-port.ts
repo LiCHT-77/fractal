@@ -1,16 +1,11 @@
-interface ExtensionPortLike {
+import type { Endpoint } from "./types.ts";
+
+export interface ExtensionPortLike {
   postMessage(message: unknown): void;
   onMessage: {
     addListener(callback: (message: unknown) => void): void;
     removeListener(callback: (message: unknown) => void): void;
   };
-}
-
-interface Endpoint {
-  send(message: unknown): void;
-  onMessage(
-    handler: (message: unknown, event: MessageEvent) => void,
-  ): () => void;
 }
 
 function isJsonRpcMessage(data: unknown): data is { jsonrpc: "2.0" } {

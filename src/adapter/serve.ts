@@ -1,12 +1,6 @@
 import type { Fractal } from "../core/app.ts";
+import type { Endpoint } from "../endpoint/types.ts";
 import { INVALID_REQUEST } from "../protocol/errors.ts";
-
-interface Endpoint {
-  send: (message: unknown) => void;
-  onMessage: (
-    handler: (message: unknown, event: MessageEvent) => void,
-  ) => () => void;
-}
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);

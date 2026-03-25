@@ -1,4 +1,4 @@
-export type { InferResult } from "./core/app.ts";
+export type { Handler, InferResult, Middleware } from "./core/app.ts";
 export { Fractal } from "./core/app.ts";
 export type {
   Context,
