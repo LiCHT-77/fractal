@@ -1,6 +1,6 @@
 {
   "name": "@licht-77/fractal",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "type": "module",
   "description": "A type-safe JSON-RPC framework",
   "license": "MIT",
