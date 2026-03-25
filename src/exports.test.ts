@@ -12,6 +12,9 @@ describe("barrel exports", () => {
     expect(ep.messagePortEndpoint).toBeDefined();
     expect(ep.serviceWorkerEndpoint).toBeDefined();
     expect(ep.onConnect).toBeDefined();
+    expect(ep.extensionPortEndpoint).toBeDefined();
+    expect(ep.extensionRuntimeEndpoint).toBeDefined();
+    expect(ep.extensionTabEndpoint).toBeDefined();
   });
 
   test("adapter entry exports serve", async () => {

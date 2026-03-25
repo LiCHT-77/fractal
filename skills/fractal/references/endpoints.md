@@ -9,6 +9,9 @@ import {
   messagePortEndpoint,
   serviceWorkerEndpoint,
   onConnect,
+  extensionPortEndpoint,
+  extensionRuntimeEndpoint,
+  extensionTabEndpoint,
 } from "@licht-77/fractal/endpoint";
 ```
 
@@ -21,6 +24,9 @@ import {
 | `messagePortEndpoint(port)` | `MessagePort` (from `MessageChannel`, etc.) |
 | `serviceWorkerEndpoint(sw, options?)` | ServiceWorker (handshake runs in background) |
 | `onConnect(callback)` | Inside a SharedWorker to accept connections |
+| `extensionPortEndpoint(port)` | Browser extension `runtime.Port` (long-lived connection) |
+| `extensionRuntimeEndpoint(browser)` | Extension content script → background (`runtime.sendMessage`) |
+| `extensionTabEndpoint(browser, tabId)` | Extension background → specific tab (`tabs.sendMessage`) |
 
 ## `workerEndpoint(worker)`
 
@@ -113,3 +119,56 @@ onConnect((endpoint) => {
 ```
 
 Inside a ServiceWorker, use `onConnect` the same way to handle `fractal:connect` messages and establish a `MessagePort`-based channel.
+
+## `extensionPortEndpoint(port)`
+
+For communicating over a browser extension `runtime.Port` (long-lived connection):
+
+```ts
+// content-script.ts
+const port = chrome.runtime.connect({ name: "rpc" });
+const client = createClient<AppType>(extensionPortEndpoint(port));
+const result = await client.ping();
+
+// background.ts
+chrome.runtime.onConnect.addListener((port) => {
+  serve(app, extensionPortEndpoint(port));
+});
+```
+
+The adapter uses `port.onMessage.addListener` / `removeListener`. Extension Port callbacks receive `(message)` directly (not a `MessageEvent`), so the adapter synthesizes `{ data: message } as MessageEvent` internally. No `port.start()` is needed.
+
+## `extensionRuntimeEndpoint(browser)`
+
+For content script → background communication using `runtime.sendMessage` / `runtime.onMessage`:
+
+```ts
+// content-script.ts
+const client = createClient<AppType>(extensionRuntimeEndpoint(chrome));
+const result = await client.getData({ key: "settings" });
+
+// background.ts
+serve(app, extensionRuntimeEndpoint(chrome));
+```
+
+Accepts a duck-typed API object — both `chrome` and `browser` namespaces work. No sender filtering is applied; all messages from any content script are received. For 1:1 communication with a specific tab, use `extensionTabEndpoint` instead.
+
+## `extensionTabEndpoint(browser, tabId)`
+
+For background → specific tab communication using `tabs.sendMessage(tabId, message)` and `runtime.onMessage` with sender filtering (`sender.tab?.id === tabId`):
+
+```ts
+// background.ts
+const client = createClient<AppType>(extensionTabEndpoint(chrome, tabId));
+const result = await client.getPageData();
+
+// content-script.ts (use extensionRuntimeEndpoint on the content script side)
+serve(app, extensionRuntimeEndpoint(chrome));
+```
+
+| Option | Type | Description |
+|---|---|---|
+| `browser` | object | `chrome` or `browser` API object (duck-typed) |
+| `tabId` | `number` | Target tab ID |
+
+The content script side uses `extensionRuntimeEndpoint`, not `extensionTabEndpoint`. The tab endpoint is background-side only — it sends via `tabs.sendMessage` and filters incoming messages by sender tab ID.

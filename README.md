@@ -2,12 +2,12 @@
 
 Type-safe JSON-RPC framework for browser messaging.
 
-Unifies communication across **iframe**, **Worker**, **SharedWorker**, **ServiceWorker**, and **MessagePort** with a single, consistent API.
+Unifies communication across **iframe**, **Worker**, **SharedWorker**, **ServiceWorker**, **MessagePort**, and **Browser Extension** with a single, consistent API.
 
 ## Features
 
 - **Type-safe RPC** — Server method definitions infer client types automatically
-- **Transport agnostic** — 5 built-in endpoints for every browser messaging channel
+- **Transport agnostic** — 8 built-in endpoints for every browser messaging channel
 - **JSON-RPC 2.0** compliant
 - **Hono-style middleware** — Pattern matching with `*` and `**` wildcards
 - **Namespace routing** — `user.get` on the server becomes `client.user.get()` on the client
@@ -77,9 +77,14 @@ client.dispose();
 | `messagePortEndpoint(port)` | MessagePort | `@licht-77/fractal/endpoint` |
 | `serviceWorkerEndpoint(sw, options?)` | ServiceWorker / ServiceWorkerContainer | `@licht-77/fractal/endpoint` |
 | `onConnect(callback)` | ServiceWorker (inside SW) | `@licht-77/fractal/endpoint` |
+| `extensionPortEndpoint(port)` | Browser extension `runtime.Port` | `@licht-77/fractal/endpoint` |
+| `extensionRuntimeEndpoint(browser)` | Extension content script → background | `@licht-77/fractal/endpoint` |
+| `extensionTabEndpoint(browser, tabId)` | Extension background → specific tab | `@licht-77/fractal/endpoint` |
 
 `windowEndpoint` accepts `{ origin?: string; listener?: EventTarget }`.
 `serviceWorkerEndpoint` accepts a `ServiceWorker` or `ServiceWorkerContainer` (`navigator.serviceWorker`) and returns an `Endpoint` synchronously. Options: `{ timeout?: number }`. The handshake runs in the background; messages are buffered until it completes.
+
+The three extension endpoints wrap browser extension messaging APIs. `extensionPortEndpoint` wraps a `runtime.Port` (long-lived connection). `extensionRuntimeEndpoint` uses `runtime.sendMessage` / `runtime.onMessage` (content script → background). `extensionTabEndpoint` uses `tabs.sendMessage` / `runtime.onMessage` with sender tab filtering (background → specific tab). All accept duck-typed API objects, so both `chrome` and `browser` namespaces work.
 
 ## Middleware
 
@@ -173,6 +178,9 @@ windowEndpoint(target, options?): Endpoint
 messagePortEndpoint(port): Endpoint
 serviceWorkerEndpoint(sw, options?): Endpoint
 onConnect(callback: (endpoint: Endpoint) => void): void
+extensionPortEndpoint(port): Endpoint
+extensionRuntimeEndpoint(browser): Endpoint
+extensionTabEndpoint(browser, tabId): Endpoint
 ```
 
 ## License

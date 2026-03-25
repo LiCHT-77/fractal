@@ -273,6 +273,120 @@ export function createMockServiceWorkerContainer(): MockServiceWorkerContainer {
   return { ready, _resolveReady: resolveReady, _rejectReady: rejectReady };
 }
 
+// ─── Extension Port Mock ───
+
+export interface MockExtensionPort {
+  postMessage: MockInstance<(message: unknown) => void>;
+  onMessage: {
+    addListener: MockInstance<(callback: (message: unknown) => void) => void>;
+    removeListener: MockInstance<
+      (callback: (message: unknown) => void) => void
+    >;
+  };
+  /** Simulate receiving a message on this port */
+  dispatchMessage(data: unknown): void;
+  _listeners: Array<(message: unknown) => void>;
+}
+
+export function createMockExtensionPort(): MockExtensionPort {
+  const listeners: Array<(message: unknown) => void> = [];
+
+  const postMessage = vi.fn<(message: unknown) => void>();
+
+  const addListener = vi.fn((callback: (message: unknown) => void) => {
+    listeners.push(callback);
+  });
+
+  const removeListener = vi.fn((callback: (message: unknown) => void) => {
+    const idx = listeners.indexOf(callback);
+    if (idx !== -1) listeners.splice(idx, 1);
+  });
+
+  const dispatchMessage = (data: unknown) => {
+    for (const listener of [...listeners]) {
+      listener(data);
+    }
+  };
+
+  return {
+    postMessage,
+    onMessage: { addListener, removeListener },
+    dispatchMessage,
+    _listeners: listeners,
+  };
+}
+
+// ─── Extension Browser Mock ───
+
+interface ExtensionMessageSender {
+  tab?: { id?: number };
+}
+
+export interface MockExtensionBrowser {
+  runtime: {
+    sendMessage: MockInstance<(message: unknown) => void>;
+    onMessage: {
+      addListener: MockInstance<
+        (cb: (message: unknown, sender: ExtensionMessageSender) => void) => void
+      >;
+      removeListener: MockInstance<
+        (cb: (message: unknown, sender: ExtensionMessageSender) => void) => void
+      >;
+    };
+  };
+  tabs: {
+    sendMessage: MockInstance<(tabId: number, message: unknown) => void>;
+  };
+  /** Simulate receiving a message via runtime.onMessage */
+  dispatchRuntimeMessage(data: unknown, sender: ExtensionMessageSender): void;
+  _runtimeListeners: Array<
+    (message: unknown, sender: ExtensionMessageSender) => void
+  >;
+}
+
+export function createMockExtensionBrowser(): MockExtensionBrowser {
+  const runtimeListeners: Array<
+    (message: unknown, sender: ExtensionMessageSender) => void
+  > = [];
+
+  const runtimeSendMessage = vi.fn<(message: unknown) => void>();
+  const tabsSendMessage = vi.fn<(tabId: number, message: unknown) => void>();
+
+  const addListener = vi.fn(
+    (cb: (message: unknown, sender: ExtensionMessageSender) => void) => {
+      runtimeListeners.push(cb);
+    },
+  );
+
+  const removeListener = vi.fn(
+    (cb: (message: unknown, sender: ExtensionMessageSender) => void) => {
+      const idx = runtimeListeners.indexOf(cb);
+      if (idx !== -1) runtimeListeners.splice(idx, 1);
+    },
+  );
+
+  const dispatchRuntimeMessage = (
+    data: unknown,
+    sender: ExtensionMessageSender,
+  ) => {
+    for (const listener of [...runtimeListeners]) {
+      listener(data, sender);
+    }
+  };
+
+  return {
+    runtime: {
+      sendMessage: runtimeSendMessage,
+      onMessage: { addListener, removeListener },
+    },
+    tabs: {
+      sendMessage: tabsSendMessage,
+    },
+    dispatchRuntimeMessage,
+    _runtimeListeners: runtimeListeners,
+  };
+}
+
 // ─── ServiceWorkerGlobalScope Mock ───
 
 export interface MockServiceWorkerGlobalScope {

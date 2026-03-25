@@ -17,6 +17,7 @@ Fractal は、ブラウザ内部の messaging 機構を統一的に扱うため�
 - Dedicated Worker
 - SharedWorker
 - Service Worker
+- Browser Extension messaging (`runtime.Port`, `runtime.sendMessage`, `tabs.sendMessage`)
 
 ### 1.3 対象ユーザ
 
@@ -322,6 +323,141 @@ onConnect((endpoint) => {
 > **注意:** 通信は `FetchEvent` ではなく `MessageEvent` ベースである。`MessageChannel` 確立後は実質的に `messagePortEndpoint` と同じ仕組みで動作する。
 
 > **注意:** ハンドシェイクメッセージは `jsonrpc: "2.0"` フィールドを持たない独自フォーマットである。そのため、同一 Service Worker 上で他のライブラリやアプリケーションコードが `postMessage` を使用していても干渉しない。ハンドシェイクの具体的なメッセージフォーマットは内部実装の詳細であり、外部から依存すべきではない。
+
+#### Extension Port Endpoint
+
+Browser Extension の `runtime.Port`（長寿命接続）を利用した通信に使用する。
+
+```ts
+import { extensionPortEndpoint } from "fractal/endpoint";
+
+const port = chrome.runtime.connect({ name: "rpc" });
+const endpoint = extensionPortEndpoint(port);
+```
+
+| パラメータ | 型 | 説明 |
+|---|---|---|
+| `port` | `ExtensionPortLike` | `runtime.Port` 互換オブジェクト。`postMessage(message)` と `onMessage.addListener` / `onMessage.removeListener` を持つ |
+
+`extensionPortEndpoint` は `port.onMessage.addListener` / `removeListener` を使用してメッセージを受信する。Extension Port のコールバックは `(message)` を直接受け取るため（`MessageEvent` ではない）、内部で `{ data: message } as MessageEvent` を合成して handler に渡す。`port.start()` は不要（Extension Port には存在しない）。
+
+**background.ts:**
+
+```ts
+import { Fractal } from "@licht-77/fractal";
+import { serve } from "@licht-77/fractal/adapter";
+import { extensionPortEndpoint } from "@licht-77/fractal/endpoint";
+
+const app = new Fractal()
+  .method("ping", (c) => c.json("pong"));
+
+chrome.runtime.onConnect.addListener((port) => {
+  serve(app, extensionPortEndpoint(port));
+});
+```
+
+**content-script.ts:**
+
+```ts
+import { createClient } from "@licht-77/fractal/client";
+import { extensionPortEndpoint } from "@licht-77/fractal/endpoint";
+
+const port = chrome.runtime.connect({ name: "rpc" });
+const client = createClient<AppType>(extensionPortEndpoint(port));
+
+const result = await client.ping(); // "pong"
+```
+
+#### Extension Runtime Endpoint
+
+Content script から background への通信に使用する。`runtime.sendMessage` で送信し、`runtime.onMessage` で受信する。
+
+```ts
+import { extensionRuntimeEndpoint } from "fractal/endpoint";
+
+// content script 側
+const endpoint = extensionRuntimeEndpoint(chrome);
+```
+
+| パラメータ | 型 | 説明 |
+|---|---|---|
+| `browser` | `ExtensionBrowserLike` | `chrome` または `browser` API オブジェクト（duck-typed）。`runtime.sendMessage`、`runtime.onMessage.addListener` / `removeListener` を持つ |
+
+`extensionRuntimeEndpoint` は `browser.runtime.sendMessage(message)` で送信し、`browser.runtime.onMessage` で受信する。sender によるフィルタリングは行わない。`chrome` / `browser` どちらの API オブジェクトにも対応する（duck-typed）。
+
+**content-script.ts:**
+
+```ts
+import { createClient } from "@licht-77/fractal/client";
+import { extensionRuntimeEndpoint } from "@licht-77/fractal/endpoint";
+
+const client = createClient<AppType>(extensionRuntimeEndpoint(chrome));
+const result = await client.getData({ key: "settings" });
+```
+
+**background.ts:**
+
+```ts
+import { Fractal } from "@licht-77/fractal";
+import { serve } from "@licht-77/fractal/adapter";
+import { extensionRuntimeEndpoint } from "@licht-77/fractal/endpoint";
+
+const app = new Fractal()
+  .method("getData", (c: Context<{ key: string }>) => {
+    return c.json({ key: c.req.params.key, value: "..." });
+  });
+
+serve(app, extensionRuntimeEndpoint(chrome));
+```
+
+> **注意:** `extensionRuntimeEndpoint` は sender フィルタを行わないため、全 content script からのメッセージを受信する。特定タブとの 1:1 通信が必要な場合は `extensionTabEndpoint` を使用すること。
+
+#### Extension Tab Endpoint
+
+Background script から特定のタブへの通信に使用する。`tabs.sendMessage(tabId, message)` で送信し、`runtime.onMessage` で受信する際に `sender.tab?.id === tabId` でフィルタリングする。
+
+```ts
+import { extensionTabEndpoint } from "fractal/endpoint";
+
+// background 側
+const endpoint = extensionTabEndpoint(chrome, tabId);
+```
+
+| パラメータ | 型 | 説明 |
+|---|---|---|
+| `browser` | `ExtensionBrowserLike` | `chrome` または `browser` API オブジェクト（duck-typed）。`tabs.sendMessage`、`runtime.onMessage.addListener` / `removeListener` を持つ |
+| `tabId` | `number` | 通信先のタブ ID |
+
+**background.ts:**
+
+```ts
+import { createClient } from "@licht-77/fractal/client";
+import { extensionTabEndpoint } from "@licht-77/fractal/endpoint";
+
+chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
+  if (changeInfo.status === "complete") {
+    const client = createClient<AppType>(extensionTabEndpoint(chrome, tabId));
+    const result = await client.getPageData();
+  }
+});
+```
+
+**content-script.ts:**
+
+```ts
+import { Fractal } from "@licht-77/fractal";
+import { serve } from "@licht-77/fractal/adapter";
+import { extensionRuntimeEndpoint } from "@licht-77/fractal/endpoint";
+
+const app = new Fractal()
+  .method("getPageData", (c) => {
+    return c.json({ title: document.title, url: location.href });
+  });
+
+serve(app, extensionRuntimeEndpoint(chrome));
+```
+
+> **注意:** content script 側は `extensionRuntimeEndpoint` を使用する。`extensionTabEndpoint` は background 側専用であり、`tabs.sendMessage` を送信、`runtime.onMessage` の sender tab ID フィルタで受信を行う。
 
 ---
 
