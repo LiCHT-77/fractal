@@ -1,8 +1,10 @@
 # @licht-77/fractal
 
-Type-safe JSON-RPC framework for browser messaging.
+**"Hono / tRPC for Browser Messaging"**
 
-Unifies communication across **iframe**, **Worker**, **SharedWorker**, **ServiceWorker**, **MessagePort**, and **Browser Extension** with a single, consistent API.
+Type-safe JSON-RPC framework for browser messaging. Unifies communication across **iframe**, **Worker**, **SharedWorker**, **ServiceWorker**, **MessagePort**, and **Browser Extension** with a single, consistent API.
+
+Unlike Comlink, which provides a "remote object" RPC model centered on Web Workers, Fractal is an **application-level RPC framework** for the full range of browser messaging — with JSON-RPC 2.0 as an explicit API contract, transport-agnostic architecture, middleware pipelines, and typed client generation.
 
 ## Features
 
